@@ -191,6 +191,39 @@ func TestSitemapWriteImages(t *testing.T) {
 	`)))
 }
 
+func TestSitemapWriteEscaping(t *testing.T) {
+	RegisterTestingT(t)
+
+	var out bytes.Buffer
+	var entries []SimpleEntry
+
+	out.Reset()
+	entries = []SimpleEntry{
+		SimpleEntry{
+			Loc:    `http://www.example.com/q="<'a'&'b'>"`,
+			Images: []string{`"<`, `qwe&qw&ewq`, `asd`},
+		},
+	}
+	Ω(SitemapWrite(&out, &ArrayInput{Arr: entries})).Should(BeNil())
+	Ω(out.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>http://www.example.com/q=&#34;&lt;&#39;a&#39;&amp;&#39;b&#39;&gt;&#34;</loc>
+    <image:image>
+      <image:loc>&#34;&lt;</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>qwe&amp;qw&amp;ewq</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>asd</image:loc>
+    </image:image>
+  </url>
+</urlset>
+	`)))
+}
+
 type DynamicInput struct {
 	Size    int
 	NextIdx int
