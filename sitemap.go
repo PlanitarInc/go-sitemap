@@ -31,8 +31,6 @@ func t2str(t time.Time) string {
 // XXX The limitation of file size:
 //  - according to http://www.sitemaps.org/protocol.html:
 //     <50.000 urls and <10MB
-//  - according to Google:
-//     <50.000 urls and <50MB
 // XXX It should be fine until we reach 10.000 entries
 func SitemapWrite(w io.Writer, in Input) error {
 	urlset := xml.Name{Local: "urlset"}
