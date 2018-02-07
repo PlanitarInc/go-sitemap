@@ -1,7 +1,10 @@
 package sitemap
 
+import "sync/atomic"
+
 type ChannelInput struct {
 	channel       chan UrlEntry
+	closed        int32
 	lastReadEntry UrlEntry
 }
 
@@ -12,10 +15,23 @@ func NewChannelInput() *ChannelInput {
 }
 
 func (in *ChannelInput) Feed(entry UrlEntry) {
+	if atomic.LoadInt32(&in.closed) > 0 {
+		return
+	}
+
 	in.channel <- entry
 }
 
 func (in *ChannelInput) Close() {
+	if atomic.LoadInt32(&in.closed) > 0 {
+		return
+	}
+
+	defer func() {
+		_ = recover()
+	}()
+
+	atomic.StoreInt32(&in.closed, 1)
 	close(in.channel)
 }
 

@@ -8,6 +8,34 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+func TestChannelClose(t *testing.T) {
+	t.Run("close", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		in := NewChannelInput()
+
+		Ω(in.channel).ShouldNot(BeClosed())
+		Ω(in.closed).Should(BeEquivalentTo(0))
+		in.Close()
+		Ω(in.channel).Should(BeClosed())
+		Ω(in.closed).Should(BeNumerically(">", 0))
+	})
+
+	t.Run("doubleClose", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		in := NewChannelInput()
+
+		Ω(in.channel).ShouldNot(BeClosed())
+		Ω(in.closed).Should(BeEquivalentTo(0))
+		in.Close()
+		Ω(in.channel).Should(BeClosed())
+		Ω(in.closed).Should(BeNumerically(">", 0))
+		in.Close()
+		Ω(in.closed).Should(BeNumerically(">", 0))
+	})
+}
+
 func TestChannelFeed(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
 		RegisterTestingT(t)
@@ -27,16 +55,15 @@ func TestChannelFeed(t *testing.T) {
 		Eventually(in.channel).Should(Receive(Equal(&SimpleEntry{Loc: "one"})))
 		Ω(in.channel).ShouldNot(BeClosed())
 	})
-}
 
-func TestChannelClose(t *testing.T) {
-	RegisterTestingT(t)
+	t.Run("closedChannel", func(t *testing.T) {
+		RegisterTestingT(t)
 
-	in := NewChannelInput()
-
-	Ω(in.channel).ShouldNot(BeClosed())
-	in.Close()
-	Ω(in.channel).Should(BeClosed())
+		in := NewChannelInput()
+		in.Close()
+		Ω(in.channel).Should(BeClosed())
+		in.Feed(&SimpleEntry{Loc: "one"})
+	})
 }
 
 func TestChannelInputNext(t *testing.T) {
