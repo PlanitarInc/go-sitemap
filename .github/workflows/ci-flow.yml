@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Test
+      run: go test -v ./...
+
+    - name: Verify Modules
+      run: >
+        go mod tidy
+        go mod verify
+
+    - name: Ensure no files modified
+      run: >
+        if [ `git status -s | wc -l` -gt 0 ]; then
+          echo "Expected no new/modified files."
+          echo "Got (git status -s):"
+          git status -s
+          echo ""
+          echo "Diff"
+          git --no-pager diff
+          exit 1
+        fi
