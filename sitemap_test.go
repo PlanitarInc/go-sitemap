@@ -250,7 +250,7 @@ func benchSitemap(size int, b *testing.B) {
 	}
 
 	for n := 0; n < b.N; n++ {
-		SitemapWrite(ioutil.Discard, &in)
+		_ = SitemapWrite(ioutil.Discard, &in)
 	}
 }
 
