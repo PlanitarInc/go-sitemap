@@ -37,18 +37,18 @@ func SitemapWrite(w io.Writer, in Input) error {
 	start := xml.StartElement{
 		Name: urlset,
 		Attr: []xml.Attr{
-			xml.Attr{
+			{
 				Name:  xml.Name{Local: "xmlns"},
 				Value: "http://www.sitemaps.org/schemas/sitemap/0.9",
 			},
-			xml.Attr{
+			{
 				Name:  xml.Name{Local: "xmlns:image"},
 				Value: "http://www.google.com/schemas/sitemap-image/1.1",
 			},
 		},
 	}
 
-	io.WriteString(w, xml.Header)
+	_, _ = io.WriteString(w, xml.Header)
 	e := xml.NewEncoder(w)
 	e.Indent("", "  ")
 
