@@ -6,8 +6,9 @@ Example:
 package main
 
 import (
-	"os"
 	"time"
+	"bytes"
+	"fmt"
 
 	sitemap "github.com/PlanitarInc/go-sitemap"
 )
@@ -46,6 +47,7 @@ func (e SimpleEntry) GetImages() []string {
 }
 
 func main() {
+	var output []bytes.Buffer
 	entries := []SimpleEntry{
 		SimpleEntry{
 			Url:      "http://example.com/",
@@ -61,7 +63,8 @@ func main() {
 		},
 	}
 
-	sitemap.SitemapWrite(os.Stdout, &ArrayInput{Arr: entries})
+	sitemap.SitemapWrite(&output, &ArrayInput{Arr: entries})
+	fmt.Println(output[0].String())
 }
 ```
 
