@@ -1,6 +1,7 @@
 package sitemap
 
 import (
+	"bytes"
 	"encoding/xml"
 	"io"
 	"time"
@@ -32,51 +33,68 @@ func t2str(t time.Time) string {
 //  - according to http://www.sitemaps.org/protocol.html:
 //     <50.000 urls and <10MB
 // XXX It should be fine until we reach 10.000 entries
-func SitemapWrite(w io.Writer, in Input) error {
-	urlset := xml.Name{Local: "urlset"}
-	start := xml.StartElement{
-		Name: urlset,
-		Attr: []xml.Attr{
-			xml.Attr{
-				Name:  xml.Name{Local: "xmlns"},
-				Value: "http://www.sitemaps.org/schemas/sitemap/0.9",
+func SitemapWrite(w *[]bytes.Buffer, in Input) error {
+	const maxEntry int = 50000
+	i := 0
+	hasNext := in.HasNext()
+	for hasNext {
+		urlset := xml.Name{Local: "urlset"}
+		start := xml.StartElement{
+			Name: urlset,
+			Attr: []xml.Attr{
+				xml.Attr{
+					Name:  xml.Name{Local: "xmlns"},
+					Value: "http://www.sitemaps.org/schemas/sitemap/0.9",
+				},
+				xml.Attr{
+					Name:  xml.Name{Local: "xmlns:image"},
+					Value: "http://www.google.com/schemas/sitemap-image/1.1",
+				},
 			},
-			xml.Attr{
-				Name:  xml.Name{Local: "xmlns:image"},
-				Value: "http://www.google.com/schemas/sitemap-image/1.1",
-			},
-		},
-	}
+		}
+		*w = append(*w, bytes.Buffer{})
+		io.WriteString(&(*w)[i], xml.Header)
+		e := xml.NewEncoder(&(*w)[i])
+		e.Indent("", "  ")
 
-	io.WriteString(w, xml.Header)
-	e := xml.NewEncoder(w)
-	e.Indent("", "  ")
-
-	if err := e.EncodeToken(start); err != nil {
-		return err
-	}
-
-	url := Url{}
-	image := Image{}
-	for in.HasNext() {
-		entry := in.Next()
-
-		url.Loc = entry.GetLoc()
-		url.LastMod = t2str(entry.GetLastMod())
-		url.Images = []Image{}
-		for _, imageUrl := range entry.GetImages() {
-			image.Loc = imageUrl
-			url.Images = append(url.Images, image)
+		if err := e.EncodeToken(start); err != nil {
+			return err
 		}
 
-		if err := e.Encode(url); err != nil {
+		url := Url{}
+		image := Image{}
+		counter := 1
+		for hasNext {
+			entry := in.Next()
+
+			url.Loc = entry.GetLoc()
+			url.LastMod = t2str(entry.GetLastMod())
+			url.Images = []Image{}
+			for _, imageUrl := range entry.GetImages() {
+				image.Loc = imageUrl
+				url.Images = append(url.Images, image)
+			}
+
+			hasNext = in.HasNext()	
+			if err := e.Encode(url); err != nil {
+				return err
+			}
+
+			counter++
+			if counter > maxEntry {
+				i++
+				break
+			}
+		}
+
+		if err := e.EncodeToken(start.End()); err != nil {
+			return err
+		}
+
+		if err := e.Flush(); err != nil {
 			return err
 		}
 	}
 
-	if err := e.EncodeToken(start.End()); err != nil {
-		return err
-	}
-
-	return e.Flush()
+	return nil
 }
