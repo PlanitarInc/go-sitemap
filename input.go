@@ -5,6 +5,7 @@ import "time"
 type Input interface {
 	Next() UrlEntry
 	HasNext() bool
+	GetUrlsetUrl(idx int) string
 }
 
 type UrlEntry interface {
