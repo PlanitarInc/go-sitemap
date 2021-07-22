@@ -1,4 +1,6 @@
-A golang library for generation of sitemap XML files.
+[![Go Reference](https://pkg.go.dev/badge/github.com/PlanitarInc/go-sitemap.svg)](https://pkg.go.dev/github.com/PlanitarInc/go-sitemap)
+
+A GO library for generation of sitemap XML files.
 
 Example:
 
