@@ -3,6 +3,7 @@ package sitemap
 import (
 	"bytes"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -34,7 +35,7 @@ func (a ArrayInput) HasNext() bool {
 }
 
 func (a *ArrayInput) GetUrlsetUrl(idx int) string {
-	return ""
+	return "https://youriguide.com/sitemap/view" + strconv.Itoa(idx+1) + ".xml"
 }
 
 func (a *ArrayInput) Next() UrlEntry {
@@ -155,6 +156,17 @@ func TestWriteWithIndexSimple2(t *testing.T) {
     <lastmod>2015-07-22T15:48:02Z</lastmod>
   </url>
 </urlset>
+	`)))
+	Ω(out.indexBuf.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://youriguide.com/sitemap/view1.xml</loc>
+  </url>
+  <url>
+    <loc>https://youriguide.com/sitemap/view2.xml</loc>
+  </url>
+</sitemapindex>
 	`)))
 }
 
