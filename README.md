@@ -1,4 +1,7 @@
-A golang library for generation of sitemap XML files.
+[![Go Reference](https://pkg.go.dev/badge/github.com/PlanitarInc/go-sitemap.svg)](https://pkg.go.dev/github.com/PlanitarInc/go-sitemap)
+![CI Status](https://github.com/PlanitarInc/go-sitemap/actions/workflows/ci-flow.yml/badge.svg?branch=master)
+
+A GO library for generation of sitemap XML files.
 
 Example:
 
@@ -6,9 +9,8 @@ Example:
 package main
 
 import (
+	"os"
 	"time"
-	"bytes"
-	"fmt"
 
 	sitemap "github.com/PlanitarInc/go-sitemap"
 )
@@ -47,7 +49,6 @@ func (e SimpleEntry) GetImages() []string {
 }
 
 func main() {
-	var output []bytes.Buffer
 	entries := []SimpleEntry{
 		SimpleEntry{
 			Url:      "http://example.com/",
@@ -63,8 +64,7 @@ func main() {
 		},
 	}
 
-	sitemap.SitemapWrite(&output, &ArrayInput{Arr: entries})
-	fmt.Println(output[0].String())
+	sitemap.SitemapWrite(os.Stdout, &ArrayInput{Arr: entries})
 }
 ```
 

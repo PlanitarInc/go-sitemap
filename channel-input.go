@@ -1,6 +1,9 @@
 package sitemap
 
-import "sync/atomic"
+import (
+	"strconv"
+	"sync/atomic"
+)
 
 type ChannelInput struct {
 	channel       chan UrlEntry
@@ -48,4 +51,8 @@ func (in *ChannelInput) HasNext() bool {
 
 func (in *ChannelInput) Next() UrlEntry {
 	return in.lastReadEntry
+}
+
+func (in *ChannelInput) GetUrlsetUrl(idx int) string {
+	return "https://youriguide.com/sitemap/view" + strconv.Itoa(idx+1) + ".xml"
 }

@@ -1,7 +1,6 @@
 package sitemap
 
 import (
-	"bytes"
 	"testing"
 	"time"
 
@@ -115,7 +114,7 @@ func TestChannelInputHasNext(t *testing.T) {
 func TestSitemapWriteChannelInput(t *testing.T) {
 	RegisterTestingT(t)
 
-	out := &bytes.Buffer{}
+	var out SiteMapOutlet
 	in := NewChannelInput()
 
 	go func(in *ChannelInput) {
@@ -134,8 +133,8 @@ func TestSitemapWriteChannelInput(t *testing.T) {
 		in.Close()
 	}(in)
 
-	Ω(SitemapWrite(out, in)).Should(BeNil())
-	Ω(out.String()).Should(MatchXML(`
+	Ω(WriteWithIndex(&out, in, 5)).Should(BeNil())
+	Ω(out.siteMapBuf[0].String()).Should(MatchXML(`
 		<?xml version="1.0" encoding="UTF-8"?>
 		<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
 			xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">

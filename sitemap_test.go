@@ -2,13 +2,27 @@ package sitemap
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 	"time"
 
 	. "github.com/onsi/gomega"
 )
+
+type SiteMapOutlet struct {
+	indexBuf   bytes.Buffer
+	siteMapBuf []bytes.Buffer
+}
+
+func (out *SiteMapOutlet) Index() io.Writer {
+	return &out.indexBuf
+}
+
+func (out *SiteMapOutlet) Urlset() io.Writer {
+	out.siteMapBuf = append(out.siteMapBuf, bytes.Buffer{})
+	return &out.siteMapBuf[len(out.siteMapBuf)-1]
+}
 
 type ArrayInput struct {
 	Arr     []SimpleEntry
@@ -17,6 +31,10 @@ type ArrayInput struct {
 
 func (a ArrayInput) HasNext() bool {
 	return a.NextIdx < len(a.Arr)
+}
+
+func (a *ArrayInput) GetUrlsetUrl(idx int) string {
+	return ""
 }
 
 func (a *ArrayInput) Next() UrlEntry {
@@ -43,31 +61,28 @@ func (e SimpleEntry) GetImages() []string {
 	return e.Images
 }
 
-func TestSitemapWriteEmpty(t *testing.T) {
+func TestWriteWithIndexEmpty(t *testing.T) {
 	RegisterTestingT(t)
 
-	var out bytes.Buffer
+	var out SiteMapOutlet
 
-	Ω(SitemapWrite(&out, &ArrayInput{})).Should(BeNil())
-	Ω(out.String()).Should(Equal(strings.TrimSpace(`
+	Ω(WriteWithIndex(&out, &ArrayInput{}, 5)).Should(BeNil())
+	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"></urlset>
 	`)))
 }
 
-func TestSitemapWriteSimple(t *testing.T) {
+func TestWriteWithIndexSimple(t *testing.T) {
 	RegisterTestingT(t)
 
-	var out bytes.Buffer
-	var entries []SimpleEntry
-
-	out.Reset()
-	entries = []SimpleEntry{
+	var out SiteMapOutlet
+	entries := []SimpleEntry{
 		SimpleEntry{},
 		SimpleEntry{},
 	}
-	Ω(SitemapWrite(&out, &ArrayInput{Arr: entries})).Should(BeNil())
-	Ω(out.String()).Should(Equal(strings.TrimSpace(`
+	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)).Should(BeNil())
+	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
@@ -78,9 +93,11 @@ func TestSitemapWriteSimple(t *testing.T) {
   </url>
 </urlset>
 	`)))
-
-	out.Reset()
-	entries = []SimpleEntry{
+}
+func TestWriteWithIndexSimple2(t *testing.T) {
+	RegisterTestingT(t)
+	var out SiteMapOutlet
+	entries := []SimpleEntry{
 		SimpleEntry{
 			Loc:     "one",
 			LastMod: time.Date(1999, 12, 31, 23, 59, 59, 0, time.UTC),
@@ -94,8 +111,8 @@ func TestSitemapWriteSimple(t *testing.T) {
 			LastMod: time.Date(2015, 7, 22, 15, 48, 2, 0, time.UTC),
 		},
 	}
-	Ω(SitemapWrite(&out, &ArrayInput{Arr: entries})).Should(BeNil())
-	Ω(out.String()).Should(Equal(strings.TrimSpace(`
+	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)).Should(BeNil())
+	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
@@ -113,21 +130,18 @@ func TestSitemapWriteSimple(t *testing.T) {
 	`)))
 }
 
-func TestSitemapWriteImages(t *testing.T) {
+func TestWriteWithIndexImages(t *testing.T) {
 	RegisterTestingT(t)
 
-	var out bytes.Buffer
-	var entries []SimpleEntry
-
-	out.Reset()
-	entries = []SimpleEntry{
+	var out SiteMapOutlet
+	entries := []SimpleEntry{
 		SimpleEntry{
 			Images: []string{},
 		},
 		SimpleEntry{},
 	}
-	Ω(SitemapWrite(&out, &ArrayInput{Arr: entries})).Should(BeNil())
-	Ω(out.String()).Should(Equal(strings.TrimSpace(`
+	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)).Should(BeNil())
+	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
@@ -138,9 +152,12 @@ func TestSitemapWriteImages(t *testing.T) {
   </url>
 </urlset>
 	`)))
+}
+func TestWriteWithIndexImages2(t *testing.T) {
+	RegisterTestingT(t)
 
-	out.Reset()
-	entries = []SimpleEntry{
+	var out SiteMapOutlet
+	entries := []SimpleEntry{
 		SimpleEntry{
 			Loc:    "one",
 			Images: []string{"a", "b", "c"},
@@ -153,8 +170,8 @@ func TestSitemapWriteImages(t *testing.T) {
 			Images: []string{"w", "x", "y", "z"},
 		},
 	}
-	Ω(SitemapWrite(&out, &ArrayInput{Arr: entries})).Should(BeNil())
-	Ω(out.String()).Should(Equal(strings.TrimSpace(`
+	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)).Should(BeNil())
+	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
@@ -191,21 +208,18 @@ func TestSitemapWriteImages(t *testing.T) {
 	`)))
 }
 
-func TestSitemapWriteEscaping(t *testing.T) {
+func TestWriteWithIndexEscaping(t *testing.T) {
 	RegisterTestingT(t)
 
-	var out bytes.Buffer
-	var entries []SimpleEntry
-
-	out.Reset()
-	entries = []SimpleEntry{
+	var out SiteMapOutlet
+	entries := []SimpleEntry{
 		SimpleEntry{
 			Loc:    `http://www.example.com/q="<'a'&'b'>"`,
 			Images: []string{`"<`, `qwe&qw&ewq`, `asd`},
 		},
 	}
-	Ω(SitemapWrite(&out, &ArrayInput{Arr: entries})).Should(BeNil())
-	Ω(out.String()).Should(Equal(strings.TrimSpace(`
+	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)).Should(BeNil())
+	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
@@ -239,7 +253,12 @@ func (d *DynamicInput) Next() UrlEntry {
 	return d.Entry
 }
 
+func (a *DynamicInput) GetUrlsetUrl(idx int) string {
+	return ""
+}
+
 func benchSitemap(size int, b *testing.B) {
+	var out SiteMapOutlet
 	in := DynamicInput{
 		Size: size,
 		Entry: SimpleEntry{
@@ -250,7 +269,7 @@ func benchSitemap(size int, b *testing.B) {
 	}
 
 	for n := 0; n < b.N; n++ {
-		SitemapWrite(ioutil.Discard, &in)
+		_ = WriteWithIndex(&out, &in, 5)
 	}
 }
 
