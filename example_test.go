@@ -1,13 +1,30 @@
 package sitemap_test
 
 import (
-	"os"
+	"bytes"
+	"fmt"
+	"io"
 	"time"
 
 	"github.com/PlanitarInc/go-sitemap"
 )
 
-func ExampleSitemapWrite() {
+type SiteMapOutlet struct {
+	indexBuf   bytes.Buffer
+	siteMapBuf []bytes.Buffer
+}
+
+func (out *SiteMapOutlet) Index() io.Writer {
+	return &out.indexBuf
+}
+
+func (out *SiteMapOutlet) Urlset() io.Writer {
+	out.siteMapBuf = append(out.siteMapBuf, bytes.Buffer{})
+	return &out.siteMapBuf[len(out.siteMapBuf)-1]
+}
+
+func ExampleWriteWithIndex() {
+	var out SiteMapOutlet
 	entries := []SimpleEntry{
 		{
 			Url:      "http://example.com/",
@@ -23,7 +40,8 @@ func ExampleSitemapWrite() {
 		},
 	}
 
-	_ = sitemap.SitemapWrite(os.Stdout, &ArrayInput{Arr: entries})
+	_ = sitemap.WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)
+	fmt.Println(out.siteMapBuf[0].String())
 	// Output: <?xml version="1.0" encoding="UTF-8"?>
 	// <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 	//   <url>
@@ -76,4 +94,8 @@ func (e SimpleEntry) GetLastMod() time.Time {
 
 func (e SimpleEntry) GetImages() []string {
 	return e.ImageUrls
+}
+
+func (a *ArrayInput) GetUrlsetUrl(idx int) string {
+	return ""
 }
