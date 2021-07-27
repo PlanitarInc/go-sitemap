@@ -110,6 +110,18 @@ func TestWriteWithIndexSimple2(t *testing.T) {
 			Loc:     "three",
 			LastMod: time.Date(2015, 7, 22, 15, 48, 2, 0, time.UTC),
 		},
+		SimpleEntry{
+			Loc:     "four",
+			LastMod: time.Date(1999, 12, 31, 23, 59, 59, 0, time.UTC),
+		},
+		SimpleEntry{
+			Loc:     "five",
+			LastMod: time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		SimpleEntry{
+			Loc:     "six",
+			LastMod: time.Date(2015, 7, 22, 15, 48, 2, 0, time.UTC),
+		},
 	}
 	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)).Should(BeNil())
 	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
@@ -124,6 +136,22 @@ func TestWriteWithIndexSimple2(t *testing.T) {
   </url>
   <url>
     <loc>three</loc>
+    <lastmod>2015-07-22T15:48:02Z</lastmod>
+  </url>
+  <url>
+    <loc>four</loc>
+  </url>
+  <url>
+    <loc>five</loc>
+    <lastmod>2001-01-01T00:00:00Z</lastmod>
+  </url>
+</urlset>
+	`)))
+	Ω(out.siteMapBuf[1].String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>six</loc>
     <lastmod>2015-07-22T15:48:02Z</lastmod>
   </url>
 </urlset>
