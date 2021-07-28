@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"io"
 	"time"
+	"errors"
 )
 
 type Url struct {
