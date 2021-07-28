@@ -56,8 +56,8 @@ func SitemapWrite(w io.Writer, in Input) error {
 		return err
 	}
 
-	url := Url{}
-	image := Image{}
+	var url Url
+	var image Image
 	for in.HasNext() {
 		entry := in.Next()
 
