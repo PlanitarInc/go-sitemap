@@ -26,6 +26,7 @@ func t2str(t time.Time) string {
 	if t.Before(minDate) {
 		return ""
 	}
+
 	return t.Format(time.RFC3339)
 }
 
@@ -44,13 +45,18 @@ func WriteWithIndex(o Output, in Input, max int) error {
 		}
 
 		if err == nil {
-			return writeIndex(o.Index(), in, nfiles)
+			if nfiles > 1 {
+				return writeIndex(o.Index(), in, nfiles)
+			}
+
+			break
 		}
 	}
+
+	return nil
 }
 
 func writeIndex(w io.Writer, in Input, nfiles int) error {
-	// XXX write the header and initialize the XML encoder
 	sitemapindex := xml.Name{Local: "sitemapindex"}
 	start := xml.StartElement{
 		Name: sitemapindex,
@@ -64,6 +70,7 @@ func writeIndex(w io.Writer, in Input, nfiles int) error {
 	if _, err := io.WriteString(w, xml.Header); err != nil {
 		return err
 	}
+
 	e := xml.NewEncoder(w)
 	e.Indent("", "  ")
 
@@ -73,12 +80,13 @@ func writeIndex(w io.Writer, in Input, nfiles int) error {
 
 	sitemap := Url{}
 	for i := 0; i < nfiles; i++ {
-		sitemap.Loc = in.GetUrlsetUrl(i)
+		sitemap.Loc = in.GetIndexUrl(i)
 
 		if err := e.Encode(sitemap); err != nil {
 			return err
 		}
 	}
+
 	if err := e.EncodeToken(start.End()); err != nil {
 		return err
 	}
@@ -86,10 +94,6 @@ func writeIndex(w io.Writer, in Input, nfiles int) error {
 	return e.Flush()
 }
 
-// XXX The limitation of file size:
-//  - according to http://www.sitemaps.org/protocol.html:
-//     <50.000 urls and <10MB
-// XXX It should be fine until we reach 10.000 entries
 func writeUrlset(w io.Writer, in Input, max int) error {
 	urlset := xml.Name{Local: "urlset"}
 	start := xml.StartElement{
@@ -133,17 +137,8 @@ func writeUrlset(w io.Writer, in Input, max int) error {
 		}
 
 		count++
-		if count >= max { // if count >= 50_000 {
-			// XXX finalize the file and return the error
-			if err := e.EncodeToken(start.End()); err != nil {
-				return err
-			}
-
-			if err := e.Flush(); err != nil {
-				return err
-			}
-
-			return errMaxCapReached{}
+		if count >= max {
+			break
 		}
 	}
 
@@ -151,7 +146,15 @@ func writeUrlset(w io.Writer, in Input, max int) error {
 		return err
 	}
 
-	return e.Flush()
+	if err := e.Flush(); err != nil {
+		return err
+	}
+
+	if count >= max {
+		return errMaxCapReached{}
+	}
+
+	return nil
 }
 
 type errMaxCapReached struct{}

@@ -9,15 +9,35 @@ Example:
 package main
 
 import (
-	"os"
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
 	"time"
 
-	sitemap "github.com/PlanitarInc/go-sitemap"
+	"github.com/PlanitarInc/go-sitemap"
 )
 
+type SiteMapOutput struct {
+	indexBuf   bytes.Buffer
+	siteMapBuf []bytes.Buffer
+}
+
+func (out *SiteMapOutput) Index() io.Writer {
+	return &out.indexBuf
+}
+
+func (out *SiteMapOutput) Urlset() io.Writer {
+	out.siteMapBuf = append(out.siteMapBuf, bytes.Buffer{})
+	return &out.siteMapBuf[len(out.siteMapBuf)-1]
+}
+
 type ArrayInput struct {
-	Arr     []SimpleEntry
-	NextIdx int
+	Arr       []SimpleEntry
+	NextIdx   int
+	baseUrl   string
+	fileName   string
+	extension string
 }
 
 func (a ArrayInput) HasNext() bool {
@@ -28,6 +48,16 @@ func (a *ArrayInput) Next() sitemap.UrlEntry {
 	idx := a.NextIdx
 	a.NextIdx++
 	return a.Arr[idx]
+}
+
+func (a *ArrayInput) SetIndexUrl(baseUrl string, fileName string, extension string) {
+	a.baseUrl = baseUrl
+	a.fileName = fileName
+	a.extension = extension
+}
+
+func (a *ArrayInput) GetIndexUrl(idx int) string {
+	return a.baseUrl + a.fileName + strconv.Itoa(idx+1) + "." + a.extension
 }
 
 type SimpleEntry struct {
@@ -48,13 +78,18 @@ func (e SimpleEntry) GetImages() []string {
 	return e.ImageUrls
 }
 
+func (a *ArrayInput) GetUrlsetUrl(idx int) string {
+	return ""
+}
+
 func main() {
+	var out SiteMapOutput
 	entries := []SimpleEntry{
-		SimpleEntry{
+		{
 			Url:      "http://example.com/",
-			Modified: time.Now(),
+			Modified: time.Date(2025, time.November, 2, 11, 34, 58, 123, time.UTC),
 		},
-		SimpleEntry{
+		{
 			Url: "http://example.com/test/",
 			ImageUrls: []string{
 				"http://example.com/test/1.jpg",
@@ -64,7 +99,8 @@ func main() {
 		},
 	}
 
-	sitemap.SitemapWrite(os.Stdout, &ArrayInput{Arr: entries})
+	_ = sitemap.WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)
+	fmt.Println(out.siteMapBuf[0].String())
 }
 ```
 

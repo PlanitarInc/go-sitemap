@@ -5,7 +5,8 @@ import "time"
 type Input interface {
 	Next() UrlEntry
 	HasNext() bool
-	GetUrlsetUrl(idx int) string
+	SetIndexUrl(baseUrl string, fileName string, extension string)
+	GetIndexUrl(idx int) string
 }
 
 type UrlEntry interface {

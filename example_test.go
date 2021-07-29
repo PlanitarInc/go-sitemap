@@ -4,27 +4,28 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strconv"
 	"time"
 
 	"github.com/PlanitarInc/go-sitemap"
 )
 
-type SiteMapOutlet struct {
+type SiteMapOutput struct {
 	indexBuf   bytes.Buffer
 	siteMapBuf []bytes.Buffer
 }
 
-func (out *SiteMapOutlet) Index() io.Writer {
+func (out *SiteMapOutput) Index() io.Writer {
 	return &out.indexBuf
 }
 
-func (out *SiteMapOutlet) Urlset() io.Writer {
+func (out *SiteMapOutput) Urlset() io.Writer {
 	out.siteMapBuf = append(out.siteMapBuf, bytes.Buffer{})
 	return &out.siteMapBuf[len(out.siteMapBuf)-1]
 }
 
 func ExampleWriteWithIndex() {
-	var out SiteMapOutlet
+	var out SiteMapOutput
 	entries := []SimpleEntry{
 		{
 			Url:      "http://example.com/",
@@ -64,8 +65,11 @@ func ExampleWriteWithIndex() {
 }
 
 type ArrayInput struct {
-	Arr     []SimpleEntry
-	NextIdx int
+	Arr       []SimpleEntry
+	NextIdx   int
+	baseUrl   string
+	fileName   string
+	extension string
 }
 
 func (a ArrayInput) HasNext() bool {
@@ -76,6 +80,16 @@ func (a *ArrayInput) Next() sitemap.UrlEntry {
 	idx := a.NextIdx
 	a.NextIdx++
 	return a.Arr[idx]
+}
+
+func (a *ArrayInput) SetIndexUrl(baseUrl string, fileName string, extension string) {
+	a.baseUrl = baseUrl
+	a.fileName = fileName
+	a.extension = extension
+}
+
+func (a *ArrayInput) GetIndexUrl(idx int) string {
+	return a.baseUrl + a.fileName + strconv.Itoa(idx+1) + "." + a.extension
 }
 
 type SimpleEntry struct {

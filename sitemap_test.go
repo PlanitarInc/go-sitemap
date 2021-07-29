@@ -3,6 +3,7 @@ package sitemap
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 	"strconv"
 	"strings"
 	"testing"
@@ -11,16 +12,16 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-type SiteMapOutlet struct {
+type SiteMapOutput struct {
 	indexBuf   bytes.Buffer
 	siteMapBuf []bytes.Buffer
 }
 
-func (out *SiteMapOutlet) Index() io.Writer {
+func (out *SiteMapOutput) Index() io.Writer {
 	return &out.indexBuf
 }
 
-func (out *SiteMapOutlet) Urlset() io.Writer {
+func (out *SiteMapOutput) Urlset() io.Writer {
 	out.siteMapBuf = append(out.siteMapBuf, bytes.Buffer{})
 	return &out.siteMapBuf[len(out.siteMapBuf)-1]
 }
@@ -28,20 +29,29 @@ func (out *SiteMapOutlet) Urlset() io.Writer {
 type ArrayInput struct {
 	Arr     []SimpleEntry
 	NextIdx int
+	baseUrl       string
+	fileName       string
+	extension     string
 }
 
 func (a ArrayInput) HasNext() bool {
 	return a.NextIdx < len(a.Arr)
 }
 
-func (a *ArrayInput) GetUrlsetUrl(idx int) string {
-	return "https://youriguide.com/sitemap/view" + strconv.Itoa(idx+1) + ".xml"
-}
-
 func (a *ArrayInput) Next() UrlEntry {
 	idx := a.NextIdx
 	a.NextIdx++
 	return a.Arr[idx]
+}
+
+func (a *ArrayInput) SetIndexUrl(baseUrl string, fileName string, extension string) {
+	a.baseUrl = baseUrl
+	a.fileName = fileName
+	a.extension = extension
+}
+
+func (a *ArrayInput) GetIndexUrl(idx int) string {
+	return a.baseUrl + a.fileName + strconv.Itoa(idx+1) + "." + a.extension
 }
 
 type SimpleEntry struct {
@@ -65,19 +75,20 @@ func (e SimpleEntry) GetImages() []string {
 func TestWriteWithIndexEmpty(t *testing.T) {
 	RegisterTestingT(t)
 
-	var out SiteMapOutlet
-
+	var out SiteMapOutput
 	Ω(WriteWithIndex(&out, &ArrayInput{}, 5)).Should(BeNil())
 	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"></urlset>
 	`)))
+	Ω(out.indexBuf.String()).Should(Equal(""))
+	Ω(len(out.siteMapBuf)).Should(Equal(1))
 }
 
 func TestWriteWithIndexSimple(t *testing.T) {
 	RegisterTestingT(t)
 
-	var out SiteMapOutlet
+	var out SiteMapOutput
 	entries := []SimpleEntry{
 		SimpleEntry{},
 		SimpleEntry{},
@@ -94,10 +105,12 @@ func TestWriteWithIndexSimple(t *testing.T) {
   </url>
 </urlset>
 	`)))
+	Ω(out.indexBuf.String()).Should(Equal(""))
+	Ω(len(out.siteMapBuf)).Should(Equal(1))
 }
 func TestWriteWithIndexSimple2(t *testing.T) {
 	RegisterTestingT(t)
-	var out SiteMapOutlet
+	var out SiteMapOutput
 	entries := []SimpleEntry{
 		SimpleEntry{
 			Loc:     "one",
@@ -124,7 +137,8 @@ func TestWriteWithIndexSimple2(t *testing.T) {
 			LastMod: time.Date(2015, 7, 22, 15, 48, 2, 0, time.UTC),
 		},
 	}
-	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)).Should(BeNil())
+	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries, baseUrl: "https://youriguide.com/sitemap/",
+		fileName: "view", extension: "xml"}, 5)).Should(BeNil())
 	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -168,12 +182,13 @@ func TestWriteWithIndexSimple2(t *testing.T) {
   </url>
 </sitemapindex>
 	`)))
+	Ω(len(out.siteMapBuf)).Should(Equal(2))
 }
 
 func TestWriteWithIndexImages(t *testing.T) {
 	RegisterTestingT(t)
 
-	var out SiteMapOutlet
+	var out SiteMapOutput
 	entries := []SimpleEntry{
 		SimpleEntry{
 			Images: []string{},
@@ -192,11 +207,13 @@ func TestWriteWithIndexImages(t *testing.T) {
   </url>
 </urlset>
 	`)))
+	Ω(out.indexBuf.String()).Should(Equal(""))
+	Ω(len(out.siteMapBuf)).Should(Equal(1))
 }
 func TestWriteWithIndexImages2(t *testing.T) {
 	RegisterTestingT(t)
 
-	var out SiteMapOutlet
+	var out SiteMapOutput
 	entries := []SimpleEntry{
 		SimpleEntry{
 			Loc:    "one",
@@ -246,12 +263,128 @@ func TestWriteWithIndexImages2(t *testing.T) {
   </url>
 </urlset>
 	`)))
+	Ω(out.indexBuf.String()).Should(Equal(""))
+	Ω(len(out.siteMapBuf)).Should(Equal(1))
+}
+
+func TestWriteWithIndexImages3(t *testing.T) {
+	RegisterTestingT(t)
+
+	var out SiteMapOutput
+	entries := []SimpleEntry{
+		SimpleEntry{
+			Loc:    "one",
+			Images: []string{"a", "b", "c"},
+		},
+		SimpleEntry{
+			Loc: "two",
+		},
+		SimpleEntry{
+			Loc:    "three",
+			Images: []string{"w", "x", "y", "z"},
+		},
+		SimpleEntry{
+			Loc:    "four",
+			Images: []string{"a", "b", "c"},
+		},
+		SimpleEntry{
+			Loc: "five",
+		},
+		SimpleEntry{
+			Loc:    "six",
+			Images: []string{"w", "x", "y", "z"},
+		},
+	}
+	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries, baseUrl: "https://youriguide.com/sitemap/",
+		fileName: "view", extension: "xml"}, 5)).Should(BeNil())
+	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>one</loc>
+    <image:image>
+      <image:loc>a</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>b</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>c</image:loc>
+    </image:image>
+  </url>
+  <url>
+    <loc>two</loc>
+  </url>
+  <url>
+    <loc>three</loc>
+    <image:image>
+      <image:loc>w</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>x</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>y</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>z</image:loc>
+    </image:image>
+  </url>
+  <url>
+    <loc>four</loc>
+    <image:image>
+      <image:loc>a</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>b</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>c</image:loc>
+    </image:image>
+  </url>
+  <url>
+    <loc>five</loc>
+  </url>
+</urlset>
+	`)))
+	Ω(out.siteMapBuf[1].String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>six</loc>
+    <image:image>
+      <image:loc>w</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>x</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>y</image:loc>
+    </image:image>
+    <image:image>
+      <image:loc>z</image:loc>
+    </image:image>
+  </url>
+</urlset>
+	`)))
+	Ω(out.indexBuf.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://youriguide.com/sitemap/view1.xml</loc>
+  </url>
+  <url>
+    <loc>https://youriguide.com/sitemap/view2.xml</loc>
+  </url>
+</sitemapindex>
+	`)))
+	Ω(len(out.siteMapBuf)).Should(Equal(2))
 }
 
 func TestWriteWithIndexEscaping(t *testing.T) {
 	RegisterTestingT(t)
 
-	var out SiteMapOutlet
+	var out SiteMapOutput
 	entries := []SimpleEntry{
 		SimpleEntry{
 			Loc:    `http://www.example.com/q="<'a'&'b'>"`,
@@ -276,6 +409,8 @@ func TestWriteWithIndexEscaping(t *testing.T) {
   </url>
 </urlset>
 	`)))
+	Ω(out.indexBuf.String()).Should(Equal(""))
+	Ω(len(out.siteMapBuf)).Should(Equal(1))
 }
 
 type DynamicInput struct {
@@ -293,12 +428,26 @@ func (d *DynamicInput) Next() UrlEntry {
 	return d.Entry
 }
 
-func (a *DynamicInput) GetUrlsetUrl(idx int) string {
+func (a *DynamicInput) SetIndexUrl(baseUrl string, fileName string, extension string) {
+}
+
+func (a *DynamicInput) GetIndexUrl(idx int) string {
 	return ""
 }
 
+type OutputIO struct {
+}
+
+func (out *OutputIO) Index() io.Writer {
+	return ioutil.Discard
+}
+
+func (out *OutputIO) Urlset() io.Writer {
+	return ioutil.Discard
+}
+
 func benchSitemap(size int, b *testing.B) {
-	var out SiteMapOutlet
+	var out OutputIO
 	in := DynamicInput{
 		Size: size,
 		Entry: SimpleEntry{

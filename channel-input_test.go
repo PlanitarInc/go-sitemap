@@ -114,7 +114,7 @@ func TestChannelInputHasNext(t *testing.T) {
 func TestSitemapWriteChannelInput(t *testing.T) {
 	RegisterTestingT(t)
 
-	var out SiteMapOutlet
+	var out SiteMapOutput
 	in := NewChannelInput()
 
 	go func(in *ChannelInput) {
@@ -134,6 +134,7 @@ func TestSitemapWriteChannelInput(t *testing.T) {
 	}(in)
 
 	Ω(WriteWithIndex(&out, in, 5)).Should(BeNil())
+	Ω(out.indexBuf.String()).Should(Equal(""))
 	Ω(out.siteMapBuf[0].String()).Should(MatchXML(`
 		<?xml version="1.0" encoding="UTF-8"?>
 		<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
@@ -143,4 +144,5 @@ func TestSitemapWriteChannelInput(t *testing.T) {
 			<url> <loc>c</loc> </url>
 		</urlset>
 	`))
+	Ω(len(out.siteMapBuf)).Should(Equal(1))
 }
