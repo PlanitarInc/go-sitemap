@@ -22,7 +22,17 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      run: go test -v ./...
+      run: go test -cover -covermode=atomic -coverprofile=coverage.out -v ./...
+      
+    - name: Upload coverage to CodeCov
+      uses: codecov/codecov-action@v2
+      with:
+        files: ./coverage.out
+        fail_ci_if_error: true
+        verbose: true
+        
+    - name: Remove coverage file
+      run: rm ./coverage.out
 
     - name: Verify Modules
       run: |
