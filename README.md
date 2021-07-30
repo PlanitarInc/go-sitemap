@@ -12,32 +12,28 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"strconv"
 	"time"
 
-	"github.com/PlanitarInc/go-sitemap"
+	sitemap "github.com/PlanitarInc/go-sitemap"
 )
 
-type SiteMapOutput struct {
-	indexBuf   bytes.Buffer
-	siteMapBuf []bytes.Buffer
+type SitemapOutput struct {
+	IndexBuf   bytes.Buffer
+	UrlsetBufs []bytes.Buffer
 }
 
-func (out *SiteMapOutput) Index() io.Writer {
-	return &out.indexBuf
+func (out *SitemapOutput) Index() io.Writer {
+	return &out.IndexBuf
 }
 
-func (out *SiteMapOutput) Urlset() io.Writer {
-	out.siteMapBuf = append(out.siteMapBuf, bytes.Buffer{})
-	return &out.siteMapBuf[len(out.siteMapBuf)-1]
+func (out *SitemapOutput) Urlset() io.Writer {
+	out.UrlsetBufs = append(out.UrlsetBufs, bytes.Buffer{})
+	return &out.UrlsetBufs[len(out.UrlsetBufs)-1]
 }
 
 type ArrayInput struct {
-	Arr       []SimpleEntry
-	NextIdx   int
-	baseUrl   string
-	fileName   string
-	extension string
+	Arr     []SimpleEntry
+	NextIdx int
 }
 
 func (a ArrayInput) HasNext() bool {
@@ -50,14 +46,8 @@ func (a *ArrayInput) Next() sitemap.UrlEntry {
 	return a.Arr[idx]
 }
 
-func (a *ArrayInput) SetIndexUrl(baseUrl string, fileName string, extension string) {
-	a.baseUrl = baseUrl
-	a.fileName = fileName
-	a.extension = extension
-}
-
-func (a *ArrayInput) GetIndexUrl(idx int) string {
-	return a.baseUrl + a.fileName + strconv.Itoa(idx+1) + "." + a.extension
+func (a *ArrayInput) GetUrlsetUrl(n int) string {
+	return fmt.Sprintf("https://example.com/sitemap-%d.xml", n)
 }
 
 type SimpleEntry struct {
@@ -78,12 +68,7 @@ func (e SimpleEntry) GetImages() []string {
 	return e.ImageUrls
 }
 
-func (a *ArrayInput) GetUrlsetUrl(idx int) string {
-	return ""
-}
-
 func main() {
-	var out SiteMapOutput
 	entries := []SimpleEntry{
 		{
 			Url:      "http://example.com/",
@@ -99,18 +84,30 @@ func main() {
 		},
 	}
 
-	_ = sitemap.WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)
-	fmt.Println(out.siteMapBuf[0].String())
+	var out SitemapOutput
+	err := sitemap.WriteAll(&out, &ArrayInput{Arr: entries})
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
+
+	for i := range out.UrlsetBufs {
+		fmt.Printf("\n\n::: Urlset %d\n\n", i)
+		fmt.Print(out.UrlsetBufs[i].String())
+	}
+	fmt.Printf("\n\n::: Index\n\n")
+	fmt.Print(out.IndexBuf.String())
 }
 ```
 
 The output:
 ```
+::: Urlset 0
+
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>http://example.com/</loc>
-    <lastmod>2015-06-04T16:30:42-04:00</lastmod>
+    <lastmod>2025-11-02T11:34:58Z</lastmod>
   </url>
   <url>
     <loc>http://example.com/test/</loc>
@@ -125,4 +122,13 @@ The output:
     </image:image>
   </url>
 </urlset>
+
+::: Index
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://example.com/sitemap-0.xml</loc>
+  </url>
+</sitemapindex>
 ```

@@ -1,22 +1,18 @@
 package sitemap
 
-import (
-	"strconv"
-	"sync/atomic"
-)
+import "sync/atomic"
 
 type ChannelInput struct {
 	channel       chan UrlEntry
 	closed        int32
 	lastReadEntry UrlEntry
-	baseUrl       string
-	fileName       string
-	extension     string
+	getUrlsetUrl  func(int) string
 }
 
-func NewChannelInput() *ChannelInput {
+func NewChannelInput(getUrlsetUrl func(int) string) *ChannelInput {
 	return &ChannelInput{
-		channel: make(chan UrlEntry),
+		channel:      make(chan UrlEntry),
+		getUrlsetUrl: getUrlsetUrl,
 	}
 }
 
@@ -56,12 +52,10 @@ func (in *ChannelInput) Next() UrlEntry {
 	return in.lastReadEntry
 }
 
-func (in *ChannelInput) SetIndexUrl(baseUrl string, fileName string, extension string) {
-	in.baseUrl = baseUrl
-	in.fileName = fileName
-	in.extension = extension
-}
+func (in *ChannelInput) GetUrlsetUrl(n int) string {
+	if in.getUrlsetUrl == nil {
+		return ""
+	}
 
-func (in *ChannelInput) GetIndexUrl(idx int) string {
-	return in.baseUrl + in.fileName + strconv.Itoa(idx+1) + "." + in.extension
+	return in.getUrlsetUrl(n)
 }

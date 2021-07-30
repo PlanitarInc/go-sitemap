@@ -30,58 +30,51 @@ func t2str(t time.Time) string {
 	return t.Format(time.RFC3339)
 }
 
-type Output interface {
-	Index() io.Writer
-	Urlset() io.Writer
-}
-
-func WriteWithIndex(o Output, in Input, max int) error {
+// WriteAll writes all files to the given output. Urlset files are written to
+// writers provided by o.Urlset(), the function will call it every time a new
+// file is to be written. The final index file is written to a writer provided
+// by o.Index().
+// The function aborts if any unexpected error occurs when writing.
+func WriteAll(o Output, in Input) error {
 	var nfiles int
 	for {
 		nfiles++
-		err := writeUrlset(o.Urlset(), in, max)
+		err := writeUrlsetFile(o.Urlset(), in)
 		if err != nil && !errors.Is(err, errMaxCapReached{}) {
 			return err
 		}
 
 		if err == nil {
-			if nfiles > 1 {
-				return writeIndex(o.Index(), in, nfiles)
-			}
-
-			break
+			return writeIndexFile(o.Index(), in, nfiles)
 		}
 	}
-
-	return nil
 }
 
-func writeIndex(w io.Writer, in Input, nfiles int) error {
-	sitemapindex := xml.Name{Local: "sitemapindex"}
+// writeIndexFile writes Sitemap index file for N files.
+func writeIndexFile(w io.Writer, in Input, nfiles int) error {
 	start := xml.StartElement{
-		Name: sitemapindex,
+		Name: xml.Name{Local: "sitemapindex"},
 		Attr: []xml.Attr{
-			xml.Attr{
+			{
 				Name:  xml.Name{Local: "xmlns"},
 				Value: "http://www.sitemaps.org/schemas/sitemap/0.9",
 			},
 		},
 	}
+
 	if _, err := io.WriteString(w, xml.Header); err != nil {
 		return err
 	}
 
 	e := xml.NewEncoder(w)
 	e.Indent("", "  ")
-
 	if err := e.EncodeToken(start); err != nil {
 		return err
 	}
 
 	sitemap := Url{}
 	for i := 0; i < nfiles; i++ {
-		sitemap.Loc = in.GetIndexUrl(i)
-
+		sitemap.Loc = in.GetUrlsetUrl(i)
 		if err := e.Encode(sitemap); err != nil {
 			return err
 		}
@@ -94,10 +87,11 @@ func writeIndex(w io.Writer, in Input, nfiles int) error {
 	return e.Flush()
 }
 
-func writeUrlset(w io.Writer, in Input, max int) error {
-	urlset := xml.Name{Local: "urlset"}
+// writeUrlsetFile writes a single Sitemap Urlset file for the first 50K entries
+// in the given input.
+func writeUrlsetFile(w io.Writer, in Input) (retErr error) {
 	start := xml.StartElement{
-		Name: urlset,
+		Name: xml.Name{Local: "urlset"},
 		Attr: []xml.Attr{
 			{
 				Name:  xml.Name{Local: "xmlns"},
@@ -110,10 +104,12 @@ func writeUrlset(w io.Writer, in Input, max int) error {
 		},
 	}
 
-	_, _ = io.WriteString(w, xml.Header)
+	if _, err := io.WriteString(w, xml.Header); err != nil {
+		return err
+	}
+
 	e := xml.NewEncoder(w)
 	e.Indent("", "  ")
-
 	if err := e.EncodeToken(start); err != nil {
 		return err
 	}
@@ -122,6 +118,11 @@ func writeUrlset(w io.Writer, in Input, max int) error {
 	image := Image{}
 	var count int
 	for in.HasNext() {
+		if count >= maxSitemapCap {
+			retErr = errMaxCapReached{}
+			break
+		}
+
 		entry := in.Next()
 
 		url.Loc = entry.GetLoc()
@@ -137,9 +138,6 @@ func writeUrlset(w io.Writer, in Input, max int) error {
 		}
 
 		count++
-		if count >= max {
-			break
-		}
 	}
 
 	if err := e.EncodeToken(start.End()); err != nil {
@@ -150,15 +148,15 @@ func writeUrlset(w io.Writer, in Input, max int) error {
 		return err
 	}
 
-	if count >= max {
-		return errMaxCapReached{}
-	}
-
-	return nil
+	return retErr
 }
+
+const (
+	maxSitemapCap = 50_000
+)
 
 type errMaxCapReached struct{}
 
 func (e errMaxCapReached) Error() string {
-	return "Max 50K capacity is reached"
+	return "max 50K capacity is reached"
 }

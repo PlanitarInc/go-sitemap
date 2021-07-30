@@ -1,16 +1,23 @@
 package sitemap
 
-import "time"
+import (
+	"io"
+	"time"
+)
 
 type Input interface {
 	Next() UrlEntry
 	HasNext() bool
-	SetIndexUrl(baseUrl string, fileName string, extension string)
-	GetIndexUrl(idx int) string
+	GetUrlsetUrl(idx int) string
 }
 
 type UrlEntry interface {
 	GetLoc() string
 	GetLastMod() time.Time
 	GetImages() []string
+}
+
+type Output interface {
+	Index() io.Writer
+	Urlset() io.Writer
 }

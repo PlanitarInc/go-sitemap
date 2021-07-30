@@ -2,8 +2,12 @@ package sitemap
 
 import (
 	"bytes"
+	"encoding/xml"
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -12,89 +16,278 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-type SiteMapOutput struct {
-	indexBuf   bytes.Buffer
-	siteMapBuf []bytes.Buffer
-}
+func TestWriteAll(t *testing.T) {
+	customEntry := func(idx int) UrlEntry {
+		return simpleEntry{
+			Loc:     fmt.Sprintf("http://goiguide.com/%d", idx),
+			LastMod: minDate.AddDate(1, 2, 3),
+			Images: []string{
+				fmt.Sprintf("http://youriguide.com/%d.jpg", idx),
+			},
+		}
+	}
+	customUrl := func(idx int) string {
+		return fmt.Sprintf("urlset %03d", idx)
+	}
 
-func (out *SiteMapOutput) Index() io.Writer {
-	return &out.indexBuf
-}
+	type simpleSitemap struct {
+		Locs []string `xml:"url>loc"`
+	}
 
-func (out *SiteMapOutput) Urlset() io.Writer {
-	out.siteMapBuf = append(out.siteMapBuf, bytes.Buffer{})
-	return &out.siteMapBuf[len(out.siteMapBuf)-1]
-}
+	assertOutput := func(out *bufferOuput, in *dynamicInput) {
+		nsitemaps := int(math.Ceil(float64(in.Size) / 50_000))
 
-type ArrayInput struct {
-	Arr     []SimpleEntry
-	NextIdx int
-	baseUrl       string
-	fileName       string
-	extension     string
-}
+		var index simpleSitemap
+		Ω(xml.Unmarshal(out.index.Bytes(), &index)).Should(BeNil())
+		Ω(index.Locs).Should(HaveLen(nsitemaps))
+		for i := 0; i < nsitemaps; i++ {
+			Ω(index.Locs[i]).Should(Equal(fmt.Sprintf("urlset %03d", i)))
+		}
 
-func (a ArrayInput) HasNext() bool {
-	return a.NextIdx < len(a.Arr)
-}
+		Ω(out.sitemaps).Should(HaveLen(nsitemaps))
+		for i := 0; i < nsitemaps; i++ {
+			var s simpleSitemap
+			Ω(xml.Unmarshal(out.sitemaps[i].Bytes(), &s)).Should(BeNil())
 
-func (a *ArrayInput) Next() UrlEntry {
-	idx := a.NextIdx
-	a.NextIdx++
-	return a.Arr[idx]
-}
+			urlsetOffset := i * 50_000
+			nlocs := in.Size - urlsetOffset
+			if nlocs > 50_000 {
+				nlocs = 50_000
+			}
+			Ω(s.Locs).Should(HaveLen(nlocs))
 
-func (a *ArrayInput) SetIndexUrl(baseUrl string, fileName string, extension string) {
-	a.baseUrl = baseUrl
-	a.fileName = fileName
-	a.extension = extension
-}
+			for j := 0; j < nlocs; j++ {
+				Ω(s.Locs[j]).Should(Equal(fmt.Sprintf("http://goiguide.com/%d", urlsetOffset+j)))
+			}
+		}
+	}
 
-func (a *ArrayInput) GetIndexUrl(idx int) string {
-	return a.baseUrl + a.fileName + strconv.Itoa(idx+1) + "." + a.extension
-}
+	t.Run("empty", func(t *testing.T) {
+		RegisterTestingT(t)
 
-type SimpleEntry struct {
-	Loc     string
-	LastMod time.Time
-	Images  []string
-}
+		in := dynamicInput{
+			CustomEntry:     customEntry,
+			CustomUrlsetUrl: customUrl,
+		}
+		var out bufferOuput
 
-func (e SimpleEntry) GetLoc() string {
-	return e.Loc
-}
+		Ω(WriteAll(&out, &in)).Should(BeNil())
+		Ω(out.index.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>urlset 000</loc>
+  </url>
+</sitemapindex>
+		`)))
 
-func (e SimpleEntry) GetLastMod() time.Time {
-	return e.LastMod
-}
-
-func (e SimpleEntry) GetImages() []string {
-	return e.Images
-}
-
-func TestWriteWithIndexEmpty(t *testing.T) {
-	RegisterTestingT(t)
-
-	var out SiteMapOutput
-	Ω(WriteWithIndex(&out, &ArrayInput{}, 5)).Should(BeNil())
-	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
+		Ω(out.sitemaps).Should(HaveLen(1))
+		Ω(out.sitemaps[0].String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"></urlset>
-	`)))
-	Ω(out.indexBuf.String()).Should(Equal(""))
-	Ω(len(out.siteMapBuf)).Should(Equal(1))
+		`)))
+	})
+
+	t.Run("shortSingleSitemap", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		in := dynamicInput{
+			Size:            3,
+			CustomEntry:     customEntry,
+			CustomUrlsetUrl: customUrl,
+		}
+		var out bufferOuput
+
+		Ω(WriteAll(&out, &in)).Should(BeNil())
+		Ω(out.index.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>urlset 000</loc>
+  </url>
+</sitemapindex>
+		`)))
+
+		Ω(out.sitemaps).Should(HaveLen(1))
+		Ω(out.sitemaps[0].String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>http://goiguide.com/0</loc>
+    <lastmod>2001-03-04T00:00:00Z</lastmod>
+    <image:image>
+      <image:loc>http://youriguide.com/0.jpg</image:loc>
+    </image:image>
+  </url>
+  <url>
+    <loc>http://goiguide.com/1</loc>
+    <lastmod>2001-03-04T00:00:00Z</lastmod>
+    <image:image>
+      <image:loc>http://youriguide.com/1.jpg</image:loc>
+    </image:image>
+  </url>
+  <url>
+    <loc>http://goiguide.com/2</loc>
+    <lastmod>2001-03-04T00:00:00Z</lastmod>
+    <image:image>
+      <image:loc>http://youriguide.com/2.jpg</image:loc>
+    </image:image>
+  </url>
+</urlset>
+		`)))
+	})
+
+	t.Run("maxSingleSitemap", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		in := dynamicInput{
+			Size:            50_000,
+			CustomEntry:     customEntry,
+			CustomUrlsetUrl: customUrl,
+		}
+		var out bufferOuput
+
+		Ω(WriteAll(&out, &in)).Should(BeNil())
+		Ω(out.index.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>urlset 000</loc>
+  </url>
+</sitemapindex>
+		`)))
+
+		assertOutput(&out, &in)
+	})
+
+	t.Run("minTwoSitemaps", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		in := dynamicInput{
+			Size:            50_000 + 1,
+			CustomEntry:     customEntry,
+			CustomUrlsetUrl: customUrl,
+		}
+		var out bufferOuput
+
+		Ω(WriteAll(&out, &in)).Should(BeNil())
+		Ω(out.index.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>urlset 000</loc>
+  </url>
+  <url>
+    <loc>urlset 001</loc>
+  </url>
+</sitemapindex>
+		`)))
+
+		assertOutput(&out, &in)
+	})
+
+	t.Run("maxTwoSitemaps", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		in := dynamicInput{
+			Size:            50_000 * 2,
+			CustomEntry:     customEntry,
+			CustomUrlsetUrl: customUrl,
+		}
+		var out bufferOuput
+
+		Ω(WriteAll(&out, &in)).Should(BeNil())
+		assertOutput(&out, &in)
+	})
+
+	t.Run("multipleSitemaps", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		in := dynamicInput{
+			Size:            50_000*3 + 123,
+			CustomEntry:     customEntry,
+			CustomUrlsetUrl: customUrl,
+		}
+		var out bufferOuput
+
+		Ω(WriteAll(&out, &in)).Should(BeNil())
+		assertOutput(&out, &in)
+	})
+
+	t.Run("numerousSitemaps", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		in := dynamicInput{
+			Size:            50_000*11 + 97,
+			CustomEntry:     customEntry,
+			CustomUrlsetUrl: customUrl,
+		}
+		var out bufferOuput
+
+		Ω(WriteAll(&out, &in)).Should(BeNil())
+		assertOutput(&out, &in)
+	})
+
+	t.Run("failures", func(t *testing.T) {
+		t.Run("urlset", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			in := dynamicInput{
+				CustomEntry:     customEntry,
+				CustomUrlsetUrl: customUrl,
+			}
+			out := failiingOutput{
+				FailUrlset: true,
+			}
+
+			Ω(WriteAll(&out, &in)).Should(MatchError("failingWriter error"))
+		})
+
+		t.Run("index", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			in := dynamicInput{
+				CustomEntry:     customEntry,
+				CustomUrlsetUrl: customUrl,
+			}
+			out := failiingOutput{
+				FailIndex: true,
+			}
+
+			Ω(WriteAll(&out, &in)).Should(MatchError("failingWriter error"))
+		})
+
+		t.Run("both", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			in := dynamicInput{
+				CustomEntry:     customEntry,
+				CustomUrlsetUrl: customUrl,
+			}
+			out := failiingOutput{
+				FailUrlset: true,
+				FailIndex:  true,
+			}
+
+			Ω(WriteAll(&out, &in)).Should(MatchError("failingWriter error"))
+		})
+	})
 }
 
-func TestWriteWithIndexSimple(t *testing.T) {
-	RegisterTestingT(t)
+func TestWriteUrlsetFile(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		RegisterTestingT(t)
 
-	var out SiteMapOutput
-	entries := []SimpleEntry{
-		SimpleEntry{},
-		SimpleEntry{},
-	}
-	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)).Should(BeNil())
-	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
+		var out bytes.Buffer
+		Ω(writeUrlsetFile(&out, &arrayInput{})).Should(BeNil())
+		Ω(out.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"></urlset>
+		`)))
+
+		out.Reset()
+		Ω(writeUrlsetFile(&out, &arrayInput{Arr: []simpleEntry{{}, {}, {}, {}}})).Should(BeNil())
+		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
@@ -103,43 +296,37 @@ func TestWriteWithIndexSimple(t *testing.T) {
   <url>
     <loc></loc>
   </url>
+  <url>
+    <loc></loc>
+  </url>
+  <url>
+    <loc></loc>
+  </url>
 </urlset>
-	`)))
-	Ω(out.indexBuf.String()).Should(Equal(""))
-	Ω(len(out.siteMapBuf)).Should(Equal(1))
-}
-func TestWriteWithIndexSimple2(t *testing.T) {
-	RegisterTestingT(t)
-	var out SiteMapOutput
-	entries := []SimpleEntry{
-		SimpleEntry{
-			Loc:     "one",
-			LastMod: time.Date(1999, 12, 31, 23, 59, 59, 0, time.UTC),
-		},
-		SimpleEntry{
-			Loc:     "two",
-			LastMod: time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC),
-		},
-		SimpleEntry{
-			Loc:     "three",
-			LastMod: time.Date(2015, 7, 22, 15, 48, 2, 0, time.UTC),
-		},
-		SimpleEntry{
-			Loc:     "four",
-			LastMod: time.Date(1999, 12, 31, 23, 59, 59, 0, time.UTC),
-		},
-		SimpleEntry{
-			Loc:     "five",
-			LastMod: time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC),
-		},
-		SimpleEntry{
-			Loc:     "six",
-			LastMod: time.Date(2015, 7, 22, 15, 48, 2, 0, time.UTC),
-		},
-	}
-	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries, baseUrl: "https://youriguide.com/sitemap/",
-		fileName: "view", extension: "xml"}, 5)).Should(BeNil())
-	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
+		`)))
+	})
+
+	t.Run("simple", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		entries := []simpleEntry{
+			{
+				Loc:     "one",
+				LastMod: time.Date(1999, 12, 31, 23, 59, 59, 0, time.UTC),
+			},
+			{
+				Loc:     "two",
+				LastMod: time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				Loc:     "three",
+				LastMod: time.Date(2015, 7, 22, 15, 48, 2, 0, time.UTC),
+			},
+		}
+
+		var out bytes.Buffer
+		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
@@ -153,50 +340,23 @@ func TestWriteWithIndexSimple2(t *testing.T) {
     <loc>three</loc>
     <lastmod>2015-07-22T15:48:02Z</lastmod>
   </url>
-  <url>
-    <loc>four</loc>
-  </url>
-  <url>
-    <loc>five</loc>
-    <lastmod>2001-01-01T00:00:00Z</lastmod>
-  </url>
 </urlset>
-	`)))
-	Ω(out.siteMapBuf[1].String()).Should(Equal(strings.TrimSpace(`
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
-  <url>
-    <loc>six</loc>
-    <lastmod>2015-07-22T15:48:02Z</lastmod>
-  </url>
-</urlset>
-	`)))
-	Ω(out.indexBuf.String()).Should(Equal(strings.TrimSpace(`
-<?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://youriguide.com/sitemap/view1.xml</loc>
-  </url>
-  <url>
-    <loc>https://youriguide.com/sitemap/view2.xml</loc>
-  </url>
-</sitemapindex>
-	`)))
-	Ω(len(out.siteMapBuf)).Should(Equal(2))
-}
+		`)))
+	})
 
-func TestWriteWithIndexImages(t *testing.T) {
-	RegisterTestingT(t)
+	t.Run("images", func(t *testing.T) {
+		RegisterTestingT(t)
 
-	var out SiteMapOutput
-	entries := []SimpleEntry{
-		SimpleEntry{
-			Images: []string{},
-		},
-		SimpleEntry{},
-	}
-	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)).Should(BeNil())
-	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
+		entries := []simpleEntry{
+			{
+				Images: []string{},
+			},
+			{},
+		}
+
+		var out bytes.Buffer
+		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
@@ -206,29 +366,25 @@ func TestWriteWithIndexImages(t *testing.T) {
     <loc></loc>
   </url>
 </urlset>
-	`)))
-	Ω(out.indexBuf.String()).Should(Equal(""))
-	Ω(len(out.siteMapBuf)).Should(Equal(1))
-}
-func TestWriteWithIndexImages2(t *testing.T) {
-	RegisterTestingT(t)
+		`)))
 
-	var out SiteMapOutput
-	entries := []SimpleEntry{
-		SimpleEntry{
-			Loc:    "one",
-			Images: []string{"a", "b", "c"},
-		},
-		SimpleEntry{
-			Loc: "two",
-		},
-		SimpleEntry{
-			Loc:    "three",
-			Images: []string{"w", "x", "y", "z"},
-		},
-	}
-	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)).Should(BeNil())
-	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
+		entries = []simpleEntry{
+			{
+				Loc:    "one",
+				Images: []string{"a", "b", "c"},
+			},
+			{
+				Loc: "two",
+			},
+			{
+				Loc:    "three",
+				Images: []string{"w", "x", "y", "z"},
+			},
+		}
+
+		out.Reset()
+		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
@@ -262,137 +418,22 @@ func TestWriteWithIndexImages2(t *testing.T) {
     </image:image>
   </url>
 </urlset>
-	`)))
-	Ω(out.indexBuf.String()).Should(Equal(""))
-	Ω(len(out.siteMapBuf)).Should(Equal(1))
-}
+		`)))
+	})
 
-func TestWriteWithIndexImages3(t *testing.T) {
-	RegisterTestingT(t)
+	t.Run("escaping", func(t *testing.T) {
+		RegisterTestingT(t)
 
-	var out SiteMapOutput
-	entries := []SimpleEntry{
-		SimpleEntry{
-			Loc:    "one",
-			Images: []string{"a", "b", "c"},
-		},
-		SimpleEntry{
-			Loc: "two",
-		},
-		SimpleEntry{
-			Loc:    "three",
-			Images: []string{"w", "x", "y", "z"},
-		},
-		SimpleEntry{
-			Loc:    "four",
-			Images: []string{"a", "b", "c"},
-		},
-		SimpleEntry{
-			Loc: "five",
-		},
-		SimpleEntry{
-			Loc:    "six",
-			Images: []string{"w", "x", "y", "z"},
-		},
-	}
-	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries, baseUrl: "https://youriguide.com/sitemap/",
-		fileName: "view", extension: "xml"}, 5)).Should(BeNil())
-	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
-  <url>
-    <loc>one</loc>
-    <image:image>
-      <image:loc>a</image:loc>
-    </image:image>
-    <image:image>
-      <image:loc>b</image:loc>
-    </image:image>
-    <image:image>
-      <image:loc>c</image:loc>
-    </image:image>
-  </url>
-  <url>
-    <loc>two</loc>
-  </url>
-  <url>
-    <loc>three</loc>
-    <image:image>
-      <image:loc>w</image:loc>
-    </image:image>
-    <image:image>
-      <image:loc>x</image:loc>
-    </image:image>
-    <image:image>
-      <image:loc>y</image:loc>
-    </image:image>
-    <image:image>
-      <image:loc>z</image:loc>
-    </image:image>
-  </url>
-  <url>
-    <loc>four</loc>
-    <image:image>
-      <image:loc>a</image:loc>
-    </image:image>
-    <image:image>
-      <image:loc>b</image:loc>
-    </image:image>
-    <image:image>
-      <image:loc>c</image:loc>
-    </image:image>
-  </url>
-  <url>
-    <loc>five</loc>
-  </url>
-</urlset>
-	`)))
-	Ω(out.siteMapBuf[1].String()).Should(Equal(strings.TrimSpace(`
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
-  <url>
-    <loc>six</loc>
-    <image:image>
-      <image:loc>w</image:loc>
-    </image:image>
-    <image:image>
-      <image:loc>x</image:loc>
-    </image:image>
-    <image:image>
-      <image:loc>y</image:loc>
-    </image:image>
-    <image:image>
-      <image:loc>z</image:loc>
-    </image:image>
-  </url>
-</urlset>
-	`)))
-	Ω(out.indexBuf.String()).Should(Equal(strings.TrimSpace(`
-<?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://youriguide.com/sitemap/view1.xml</loc>
-  </url>
-  <url>
-    <loc>https://youriguide.com/sitemap/view2.xml</loc>
-  </url>
-</sitemapindex>
-	`)))
-	Ω(len(out.siteMapBuf)).Should(Equal(2))
-}
+		entries := []simpleEntry{
+			{
+				Loc:    `http://www.example.com/q="<'a'&'b'>"`,
+				Images: []string{`"<`, `qwe&qw&ewq`, `asd`},
+			},
+		}
 
-func TestWriteWithIndexEscaping(t *testing.T) {
-	RegisterTestingT(t)
-
-	var out SiteMapOutput
-	entries := []SimpleEntry{
-		SimpleEntry{
-			Loc:    `http://www.example.com/q="<'a'&'b'>"`,
-			Images: []string{`"<`, `qwe&qw&ewq`, `asd`},
-		},
-	}
-	Ω(WriteWithIndex(&out, &ArrayInput{Arr: entries}, 5)).Should(BeNil())
-	Ω(out.siteMapBuf[0].String()).Should(Equal(strings.TrimSpace(`
+		var out bytes.Buffer
+		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
@@ -408,63 +449,362 @@ func TestWriteWithIndexEscaping(t *testing.T) {
     </image:image>
   </url>
 </urlset>
-	`)))
-	Ω(out.indexBuf.String()).Should(Equal(""))
-	Ω(len(out.siteMapBuf)).Should(Equal(1))
+		`)))
+	})
+
+	t.Run("failures", func(t *testing.T) {
+		t.Run("errMaxCapReached", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			in := dynamicInput{
+				DefaultEntry: simpleEntry{
+					Loc:     "http://www.example.com/qweqwe",
+					LastMod: minDate.AddDate(1, 2, 3),
+					Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
+				},
+				Size: 50_000 + 1,
+			}
+
+			Ω(writeUrlsetFile(ioutil.Discard, &in)).
+				Should(MatchError("max 50K capacity is reached"))
+		})
+
+		t.Run("failingWriter", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			in := dynamicInput{
+				DefaultEntry: simpleEntry{
+					Loc:     "http://www.example.com/qweqwe",
+					LastMod: minDate.AddDate(1, 2, 3),
+					Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
+				},
+				Size: 50_000 + 1,
+			}
+
+			Ω(writeUrlsetFile(&failingWriter{}, &in)).
+				Should(MatchError("failingWriter error"))
+		})
+	})
 }
 
-type DynamicInput struct {
-	Size    int
-	NextIdx int
-	Entry   SimpleEntry
+func TestWriteIndexFile(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		emptyUrl := func(idx int) string {
+			return ""
+		}
+
+		var out bytes.Buffer
+		Ω(writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: emptyUrl}, 0)).Should(BeNil())
+		Ω(out.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></sitemapindex>
+		`)))
+	})
+
+	t.Run("default", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		var out bytes.Buffer
+		Ω(writeIndexFile(&out, &arrayInput{}, 3)).Should(BeNil())
+		Ω(out.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>urlset no. 1</loc>
+  </url>
+  <url>
+    <loc>urlset no. 2</loc>
+  </url>
+  <url>
+    <loc>urlset no. 3</loc>
+  </url>
+</sitemapindex>
+		`)))
+	})
+
+	t.Run("custom", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		simpleUrl := func(idx int) string {
+			return fmt.Sprintf("custom @%03d@", idx)
+		}
+
+		var out bytes.Buffer
+		Ω(writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: simpleUrl}, 4)).Should(BeNil())
+		Ω(out.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>custom @000@</loc>
+  </url>
+  <url>
+    <loc>custom @001@</loc>
+  </url>
+  <url>
+    <loc>custom @002@</loc>
+  </url>
+  <url>
+    <loc>custom @003@</loc>
+  </url>
+</sitemapindex>
+		`)))
+	})
+
+	t.Run("escaping", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		fancyUrl := func(idx int) string {
+			switch idx {
+			case 0:
+				return `http://www.example.com/q="<'a'&'b'>`
+			case 1:
+				return "🥴.com/"
+			case 2:
+				return "гоуайгайд.ком/"
+			default:
+				return fmt.Sprintf("🤟.🤙/?idx=<%02d>&e=/'🤪?", idx)
+			}
+		}
+
+		var out bytes.Buffer
+		Ω(writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: fancyUrl}, 5)).Should(BeNil())
+		Ω(out.String()).Should(Equal(strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>http://www.example.com/q=&#34;&lt;&#39;a&#39;&amp;&#39;b&#39;&gt;</loc>
+  </url>
+  <url>
+    <loc>🥴.com/</loc>
+  </url>
+  <url>
+    <loc>гоуайгайд.ком/</loc>
+  </url>
+  <url>
+    <loc>🤟.🤙/?idx=&lt;03&gt;&amp;e=/&#39;🤪?</loc>
+  </url>
+  <url>
+    <loc>🤟.🤙/?idx=&lt;04&gt;&amp;e=/&#39;🤪?</loc>
+  </url>
+</sitemapindex>
+		`)))
+	})
+
+	t.Run("failures", func(t *testing.T) {
+		t.Run("failingWriter", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			in := dynamicInput{
+				CustomUrlsetUrl: func(idx int) string {
+					return fmt.Sprintf("urlset %03d", idx)
+				},
+			}
+
+			Ω(writeIndexFile(&failingWriter{}, &in, 100)).
+				Should(MatchError("failingWriter error"))
+		})
+	})
 }
 
-func (d DynamicInput) HasNext() bool {
-	return d.NextIdx < d.Size
+type arrayInput struct {
+	Arr             []simpleEntry
+	CustomUrlsetUrl func(int) string
+
+	nextIdx int
 }
 
-func (d *DynamicInput) Next() UrlEntry {
-	d.NextIdx++
-	return d.Entry
+func (a arrayInput) HasNext() bool {
+	return a.nextIdx < len(a.Arr)
 }
 
-func (a *DynamicInput) SetIndexUrl(baseUrl string, fileName string, extension string) {
+func (a *arrayInput) Next() UrlEntry {
+	idx := a.nextIdx
+	a.nextIdx++
+	return a.Arr[idx]
 }
 
-func (a *DynamicInput) GetIndexUrl(idx int) string {
+func (a *arrayInput) GetUrlsetUrl(idx int) string {
+	if a.CustomUrlsetUrl != nil {
+		return a.CustomUrlsetUrl(idx)
+	}
+
+	return fmt.Sprintf("urlset no. %d", idx+1)
+}
+
+type simpleEntry struct {
+	Loc     string
+	LastMod time.Time
+	Images  []string
+}
+
+func (e simpleEntry) GetLoc() string {
+	return e.Loc
+}
+
+func (e simpleEntry) GetLastMod() time.Time {
+	return e.LastMod
+}
+
+func (e simpleEntry) GetImages() []string {
+	return e.Images
+}
+
+type failiingOutput struct {
+	FailIndex  bool
+	FailUrlset bool
+}
+
+func (o *failiingOutput) Index() io.Writer {
+	if o.FailIndex {
+		return failingWriter{}
+	}
+
+	return io.Discard
+}
+
+func (o *failiingOutput) Urlset() io.Writer {
+	if o.FailUrlset {
+		return failingWriter{}
+	}
+
+	return io.Discard
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write(bs []byte) (int, error) {
+	return 0, errors.New("failingWriter error")
+}
+
+type bufferOuput struct {
+	index    bytes.Buffer
+	sitemaps []bytes.Buffer
+}
+
+func (o *bufferOuput) Index() io.Writer {
+	return &o.index
+}
+
+func (o *bufferOuput) Urlset() io.Writer {
+	o.sitemaps = append(o.sitemaps, bytes.Buffer{})
+	return &o.sitemaps[len(o.sitemaps)-1]
+}
+
+type dynamicInput struct {
+	Size            int
+	DefaultEntry    simpleEntry
+	CustomEntry     func(int) UrlEntry
+	CustomUrlsetUrl func(int) string
+
+	nextIdx int
+}
+
+func (d *dynamicInput) Reset() {
+	d.nextIdx = 0
+}
+
+func (d dynamicInput) HasNext() bool {
+	return d.nextIdx < d.Size
+}
+
+func (d *dynamicInput) Next() UrlEntry {
+	idx := d.nextIdx
+	d.nextIdx++
+	if d.CustomEntry != nil {
+		return d.CustomEntry(idx)
+	}
+
+	return d.DefaultEntry
+}
+
+func (d *dynamicInput) GetUrlsetUrl(idx int) string {
+	if d.CustomUrlsetUrl != nil {
+		return d.CustomUrlsetUrl(idx)
+	}
+
 	return ""
 }
 
-type OutputIO struct {
-}
+type discardOutput struct{}
 
-func (out *OutputIO) Index() io.Writer {
+func (discardOutput) Index() io.Writer {
 	return ioutil.Discard
 }
 
-func (out *OutputIO) Urlset() io.Writer {
+func (discardOutput) Urlset() io.Writer {
 	return ioutil.Discard
 }
 
-func benchSitemap(size int, b *testing.B) {
-	var out OutputIO
-	in := DynamicInput{
-		Size: size,
-		Entry: SimpleEntry{
+func BenchmarkWriteAll(b *testing.B) {
+	var out discardOutput
+	in := dynamicInput{
+		DefaultEntry: simpleEntry{
 			Loc:     "http://www.example.com/qweqwe",
 			LastMod: minDate.AddDate(1, 2, 3),
 			Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
 		},
+		CustomUrlsetUrl: func(int) string {
+			return "const url"
+		},
 	}
 
-	for n := 0; n < b.N; n++ {
-		_ = WriteWithIndex(&out, &in, 5)
+	for p := 0; p < 7; p++ {
+		size := int(math.Pow10(p))
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
+			in.Size = size
+			for n := 0; n < b.N; n++ {
+				in.Reset()
+				_ = WriteAll(out, &in)
+			}
+		})
 	}
 }
 
-func BenchmarkSitemap10(b *testing.B)   { benchSitemap(10, b) }
-func BenchmarkSitemap100(b *testing.B)  { benchSitemap(100, b) }
-func BenchmarkSitemap1K(b *testing.B)   { benchSitemap(1000, b) }
-func BenchmarkSitemap10K(b *testing.B)  { benchSitemap(10000, b) }
-func BenchmarkSitemap100K(b *testing.B) { benchSitemap(100000, b) }
-func BenchmarkSitemap1M(b *testing.B)   { benchSitemap(1000000, b) }
+func BenchmarkWriteUrlset(b *testing.B) {
+	in := dynamicInput{
+		DefaultEntry: simpleEntry{
+			Loc:     "http://www.example.com/qweqwe",
+			LastMod: minDate.AddDate(1, 2, 3),
+			Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
+		},
+		CustomUrlsetUrl: func(int) string {
+			return "const url"
+		},
+	}
+
+	for p := 0; p < 7; p++ {
+		size := int(math.Pow10(p))
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
+			in.Size = size
+			for n := 0; n < b.N; n++ {
+				in.Reset()
+				_ = writeUrlsetFile(ioutil.Discard, &in)
+			}
+		})
+	}
+}
+
+func BenchmarkWriteIndex(b *testing.B) {
+	in := dynamicInput{
+		DefaultEntry: simpleEntry{
+			Loc:     "http://www.example.com/qweqwe",
+			LastMod: minDate.AddDate(1, 2, 3),
+			Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
+		},
+		CustomUrlsetUrl: func(int) string {
+			return "const url"
+		},
+	}
+
+	for p := 0; p < 6; p++ {
+		nfiles := int(math.Pow10(p))
+		b.Run(strconv.Itoa(nfiles), func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				in.Reset()
+				_ = writeIndexFile(ioutil.Discard, &in, nfiles)
+			}
+		})
+	}
+}
