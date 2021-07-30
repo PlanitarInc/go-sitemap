@@ -8,7 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestChannelClose(t *testing.T) {
+func TestChannelInput_Close(t *testing.T) {
 	t.Run("close", func(t *testing.T) {
 		RegisterTestingT(t)
 
@@ -36,7 +36,7 @@ func TestChannelClose(t *testing.T) {
 	})
 }
 
-func TestChannelFeed(t *testing.T) {
+func TestChannelInput_Feed(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
 		RegisterTestingT(t)
 
@@ -66,7 +66,7 @@ func TestChannelFeed(t *testing.T) {
 	})
 }
 
-func TestChannelInputNext(t *testing.T) {
+func TestChannelInput_Next(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		RegisterTestingT(t)
 
@@ -84,7 +84,7 @@ func TestChannelInputNext(t *testing.T) {
 	})
 }
 
-func TestChannelInputHasNext(t *testing.T) {
+func TestChannelInput_HasNext(t *testing.T) {
 	t.Run("Feed", func(t *testing.T) {
 		RegisterTestingT(t)
 
@@ -112,7 +112,7 @@ func TestChannelInputHasNext(t *testing.T) {
 	})
 }
 
-func TestChannelInputGetUrlsetUrl(t *testing.T) {
+func TestChannelInput_GetUrlsetUrl(t *testing.T) {
 	t.Run("none", func(t *testing.T) {
 		RegisterTestingT(t)
 
