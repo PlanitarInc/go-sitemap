@@ -6,11 +6,13 @@ type ChannelInput struct {
 	channel       chan UrlEntry
 	closed        int32
 	lastReadEntry UrlEntry
+	getUrlsetUrl  func(int) string
 }
 
-func NewChannelInput() *ChannelInput {
+func NewChannelInput(getUrlsetUrl func(int) string) *ChannelInput {
 	return &ChannelInput{
-		channel: make(chan UrlEntry),
+		channel:      make(chan UrlEntry),
+		getUrlsetUrl: getUrlsetUrl,
 	}
 }
 
@@ -48,4 +50,12 @@ func (in *ChannelInput) HasNext() bool {
 
 func (in *ChannelInput) Next() UrlEntry {
 	return in.lastReadEntry
+}
+
+func (in *ChannelInput) GetUrlsetUrl(n int) string {
+	if in.getUrlsetUrl == nil {
+		return ""
+	}
+
+	return in.getUrlsetUrl(n)
 }

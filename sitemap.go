@@ -2,6 +2,7 @@ package sitemap
 
 import (
 	"encoding/xml"
+	"errors"
 	"io"
 	"time"
 )
@@ -25,17 +26,72 @@ func t2str(t time.Time) string {
 	if t.Before(minDate) {
 		return ""
 	}
+
 	return t.Format(time.RFC3339)
 }
 
-// XXX The limitation of file size:
-//  - according to http://www.sitemaps.org/protocol.html:
-//     <50.000 urls and <10MB
-// XXX It should be fine until we reach 10.000 entries
-func SitemapWrite(w io.Writer, in Input) error {
-	urlset := xml.Name{Local: "urlset"}
+// WriteAll writes all files to the given output. Urlset files are written to
+// writers provided by o.Urlset(), the function will call it every time a new
+// file is to be written. The final index file is written to a writer provided
+// by o.Index().
+// The function aborts if any unexpected error occurs when writing.
+func WriteAll(o Output, in Input) error {
+	var nfiles int
+	for {
+		nfiles++
+		err := writeUrlsetFile(o.Urlset(), in)
+		if err != nil && !errors.Is(err, errMaxCapReached{}) {
+			return err
+		}
+
+		if err == nil {
+			return writeIndexFile(o.Index(), in, nfiles)
+		}
+	}
+}
+
+// writeIndexFile writes Sitemap index file for N files.
+func writeIndexFile(w io.Writer, in Input, nfiles int) error {
 	start := xml.StartElement{
-		Name: urlset,
+		Name: xml.Name{Local: "sitemapindex"},
+		Attr: []xml.Attr{
+			{
+				Name:  xml.Name{Local: "xmlns"},
+				Value: "http://www.sitemaps.org/schemas/sitemap/0.9",
+			},
+		},
+	}
+
+	if _, err := io.WriteString(w, xml.Header); err != nil {
+		return err
+	}
+
+	e := xml.NewEncoder(w)
+	e.Indent("", "  ")
+	if err := e.EncodeToken(start); err != nil {
+		return err
+	}
+
+	sitemap := Url{}
+	for i := 0; i < nfiles; i++ {
+		sitemap.Loc = in.GetUrlsetUrl(i)
+		if err := e.Encode(sitemap); err != nil {
+			return err
+		}
+	}
+
+	if err := e.EncodeToken(start.End()); err != nil {
+		return err
+	}
+
+	return e.Flush()
+}
+
+// writeUrlsetFile writes a single Sitemap Urlset file for the first 50K entries
+// in the given input.
+func writeUrlsetFile(w io.Writer, in Input) (retErr error) {
+	start := xml.StartElement{
+		Name: xml.Name{Local: "urlset"},
 		Attr: []xml.Attr{
 			{
 				Name:  xml.Name{Local: "xmlns"},
@@ -48,17 +104,25 @@ func SitemapWrite(w io.Writer, in Input) error {
 		},
 	}
 
-	_, _ = io.WriteString(w, xml.Header)
+	if _, err := io.WriteString(w, xml.Header); err != nil {
+		return err
+	}
+
 	e := xml.NewEncoder(w)
 	e.Indent("", "  ")
-
 	if err := e.EncodeToken(start); err != nil {
 		return err
 	}
 
 	url := Url{}
 	image := Image{}
+	var count int
 	for in.HasNext() {
+		if count >= maxSitemapCap {
+			retErr = errMaxCapReached{}
+			break
+		}
+
 		entry := in.Next()
 
 		url.Loc = entry.GetLoc()
@@ -72,11 +136,27 @@ func SitemapWrite(w io.Writer, in Input) error {
 		if err := e.Encode(url); err != nil {
 			return err
 		}
+
+		count++
 	}
 
 	if err := e.EncodeToken(start.End()); err != nil {
 		return err
 	}
 
-	return e.Flush()
+	if err := e.Flush(); err != nil {
+		return err
+	}
+
+	return retErr
+}
+
+const (
+	maxSitemapCap = 50_000
+)
+
+type errMaxCapReached struct{}
+
+func (e errMaxCapReached) Error() string {
+	return "max 50K capacity is reached"
 }
