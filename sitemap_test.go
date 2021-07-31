@@ -862,7 +862,6 @@ func TestSitemapWriter_writeXmlString(t *testing.T) {
 func BenchmarkSitemapWriter_writeXmlString(b *testing.B) {
 	b.Run("short", func(b *testing.B) {
 		var s sitemapWriter
-
 		for n := 0; n < b.N; n++ {
 			s.writeXmlString(ioutil.Discard, "short")
 		}
@@ -870,10 +869,67 @@ func BenchmarkSitemapWriter_writeXmlString(b *testing.B) {
 
 	b.Run("long", func(b *testing.B) {
 		var s sitemapWriter
-
 		for n := 0; n < b.N; n++ {
 			s.writeXmlString(ioutil.Discard,
 				"https://goiguide.com/showcase?a=1&b=2")
+		}
+	})
+}
+
+func TestSitemapWriter_writeXmlTime(t *testing.T) {
+	RegisterTestingT(t)
+
+	tz1 := time.FixedZone("negative", -15*60*60)
+	tz2 := time.FixedZone("positive", 15*60*60)
+
+	testCases := []struct {
+		In  time.Time
+		Out string
+	}{
+		{
+			Out: "0001-01-01T00:00:00Z",
+		},
+		{
+			In:  time.Date(1999, time.December, 31, 23, 59, 59, 0, time.UTC),
+			Out: "1999-12-31T23:59:59Z",
+		},
+		{
+			In:  time.Date(2020, time.March, 15, 12, 13, 14, 999, time.UTC),
+			Out: "2020-03-15T12:13:14Z",
+		},
+		{
+			In:  time.Date(2021, time.July, 31, 23, 59, 59, 7, tz1),
+			Out: "2021-07-31T23:59:59-15:00",
+		},
+		{
+			In:  time.Date(2022, time.November, 29, 23, 59, 59, 7, tz2),
+			Out: "2022-11-29T23:59:59+15:00",
+		},
+	}
+
+	var s sitemapWriter
+	for _, tc := range testCases {
+		var b bytes.Buffer
+		s.writeXmlTime(&b, tc.In)
+		Ω(b.String()).Should(Equal(tc.Out), tc.In.Format(time.RFC3339))
+	}
+}
+
+func BenchmarkSitemapWriter_writeXmlTime(b *testing.B) {
+	b.Run("utc", func(b *testing.B) {
+		var s sitemapWriter
+		for n := 0; n < b.N; n++ {
+			t := time.Date(2020, time.March, n, 12, 13, 14, 7, time.UTC)
+			s.writeXmlTime(ioutil.Discard, t)
+		}
+	})
+
+	b.Run("custom", func(b *testing.B) {
+		tz1 := time.FixedZone("negative", -15*60*60)
+		var s sitemapWriter
+		for n := 0; n < b.N; n++ {
+			t := time.Date(2020, time.March, n, 12, 13, 14, 7, tz1)
+			s.writeXmlTime(ioutil.Discard, t)
 		}
 	})
 }

@@ -8,16 +8,6 @@ import (
 	"time"
 )
 
-var minDate = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-
-func t2str(t time.Time) string {
-	if t.Before(minDate) {
-		return ""
-	}
-
-	return t.Format(time.RFC3339)
-}
-
 // WriteAll writes all files to the given output. Urlset files are written to
 // writers provided by o.Urlset(), the function will call it every time a new
 // file is to be written. The final index file is written to a writer provided
@@ -83,9 +73,9 @@ func (s *sitemapWriter) writeUrlsetFile(w io.Writer, in Input) error {
 
 func (s *sitemapWriter) writeXmlUrlEntry(w io.Writer, e UrlEntry) {
 	loc := e.GetLoc()
-	lastMod := t2str(e.GetLastMod())
+	lastMod := e.GetLastMod()
 	images := e.GetImages()
-	if lastMod == "" && len(images) == 0 {
+	if lastMod.Before(minDate) && len(images) == 0 {
 		// fast path
 		s.writeXmlUrlLoc(w, loc)
 		return
@@ -95,9 +85,9 @@ func (s *sitemapWriter) writeXmlUrlEntry(w io.Writer, e UrlEntry) {
 	w.Write(tagLocOpen)
 	s.writeXmlString(w, loc)
 	w.Write(tagLocClose)
-	if lastMod != "" {
+	if !lastMod.Before(minDate) {
 		w.Write(tagLastmodOpen)
-		s.writeXmlString(w, lastMod)
+		s.writeXmlTime(w, lastMod)
 		w.Write(tagLastmodClose)
 	}
 	if len(images) > 0 {
@@ -126,6 +116,15 @@ func (s *sitemapWriter) writeXmlString(w io.Writer, str string) {
 	_ = xml.EscapeText(w, s.buf.Bytes())
 }
 
+func (s *sitemapWriter) writeXmlTime(w io.Writer, t time.Time) {
+	// Here we try to perform an "alloc-free" conversion of a dynamic date
+	// to a byte slice using a temporary buffer.
+	s.buf.Reset()
+	s.buf.Grow(len(time.RFC3339) * 2) // *2 is just in case
+	bs := t.AppendFormat(s.buf.Bytes(), time.RFC3339)
+	w.Write(bs)
+}
+
 // Below are constant strings converted to byte slices ahead of time
 // to avoid run-time allocations caused by string to byte slice conversions.
 var (
@@ -150,6 +149,8 @@ var (
 	tagImageOpen    = []byte("    <image:image>\n      <image:loc>")
 	tagImageClose   = []byte("</image:loc>\n    </image:image>\n")
 )
+
+var minDate = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 
 type abortWriter struct {
 	underlying io.Writer
