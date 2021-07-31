@@ -84,7 +84,8 @@ func TestWriteAll(t *testing.T) {
 		Ω(out.sitemaps).Should(HaveLen(1))
 		Ω(out.sitemaps[0].String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"></urlset>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+</urlset>
 		`)))
 	})
 
@@ -274,19 +275,21 @@ func TestWriteAll(t *testing.T) {
 	})
 }
 
-func TestWriteUrlsetFile(t *testing.T) {
+func TestSitemapWriter_WriteUrlsetFile(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		RegisterTestingT(t)
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeUrlsetFile(&out, &arrayInput{})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"></urlset>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+</urlset>
 		`)))
 
 		out.Reset()
-		Ω(writeUrlsetFile(&out, &arrayInput{Arr: []simpleEntry{{}, {}, {}, {}}})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: []simpleEntry{{}, {}, {}, {}}})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -324,8 +327,9 @@ func TestWriteUrlsetFile(t *testing.T) {
 			},
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -354,8 +358,9 @@ func TestWriteUrlsetFile(t *testing.T) {
 			{},
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -383,7 +388,7 @@ func TestWriteUrlsetFile(t *testing.T) {
 		}
 
 		out.Reset()
-		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -431,8 +436,9 @@ func TestWriteUrlsetFile(t *testing.T) {
 			},
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -465,7 +471,8 @@ func TestWriteUrlsetFile(t *testing.T) {
 				Size: 50_000 + 1,
 			}
 
-			Ω(writeUrlsetFile(ioutil.Discard, &in)).
+			var s sitemapWriter
+			Ω(s.writeUrlsetFile(ioutil.Discard, &in)).
 				Should(MatchError("max 50K capacity is reached"))
 		})
 
@@ -481,13 +488,14 @@ func TestWriteUrlsetFile(t *testing.T) {
 				Size: 50_000 + 1,
 			}
 
-			Ω(writeUrlsetFile(&failingWriter{}, &in)).
+			var s sitemapWriter
+			Ω(s.writeUrlsetFile(&failingWriter{}, &in)).
 				Should(MatchError("failingWriter error"))
 		})
 	})
 }
 
-func TestWriteIndexFile(t *testing.T) {
+func TestSitemapWriter_WriteIndexFile(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		RegisterTestingT(t)
 
@@ -495,19 +503,22 @@ func TestWriteIndexFile(t *testing.T) {
 			return ""
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: emptyUrl}, 0)).Should(BeNil())
+		Ω(s.writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: emptyUrl}, 0)).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></sitemapindex>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+</sitemapindex>
 		`)))
 	})
 
 	t.Run("default", func(t *testing.T) {
 		RegisterTestingT(t)
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeIndexFile(&out, &arrayInput{}, 3)).Should(BeNil())
+		Ω(s.writeIndexFile(&out, &arrayInput{}, 3)).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -531,8 +542,9 @@ func TestWriteIndexFile(t *testing.T) {
 			return fmt.Sprintf("custom @%03d@", idx)
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: simpleUrl}, 4)).Should(BeNil())
+		Ω(s.writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: simpleUrl}, 4)).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -568,8 +580,9 @@ func TestWriteIndexFile(t *testing.T) {
 			}
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: fancyUrl}, 5)).Should(BeNil())
+		Ω(s.writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: fancyUrl}, 5)).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -602,7 +615,8 @@ func TestWriteIndexFile(t *testing.T) {
 				},
 			}
 
-			Ω(writeIndexFile(&failingWriter{}, &in, 100)).
+			var s sitemapWriter
+			Ω(s.writeIndexFile(&failingWriter{}, &in, 100)).
 				Should(MatchError("failingWriter error"))
 		})
 	})
@@ -773,6 +787,7 @@ func BenchmarkWriteUrlset(b *testing.B) {
 			return "const url"
 		},
 	}
+	var s sitemapWriter
 
 	for p := 0; p < 7; p++ {
 		size := int(math.Pow10(p))
@@ -780,7 +795,7 @@ func BenchmarkWriteUrlset(b *testing.B) {
 			in.Size = size
 			for n := 0; n < b.N; n++ {
 				in.Reset()
-				_ = writeUrlsetFile(ioutil.Discard, &in)
+				_ = s.writeUrlsetFile(ioutil.Discard, &in)
 			}
 		})
 	}
@@ -797,13 +812,14 @@ func BenchmarkWriteIndex(b *testing.B) {
 			return "const url"
 		},
 	}
+	var s sitemapWriter
 
 	for p := 0; p < 6; p++ {
 		nfiles := int(math.Pow10(p))
 		b.Run(strconv.Itoa(nfiles), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
 				in.Reset()
-				_ = writeIndexFile(ioutil.Discard, &in, nfiles)
+				_ = s.writeIndexFile(ioutil.Discard, &in, nfiles)
 			}
 		})
 	}
