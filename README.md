@@ -3,7 +3,7 @@
 
 A GO library for generating Sitemap XML files.
 
-Example:
+Example (https://play.golang.org/p/gnefFFOgWjJ):
 
 ```go
 package main
