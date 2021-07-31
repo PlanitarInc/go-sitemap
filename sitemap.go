@@ -1,6 +1,7 @@
 package sitemap
 
 import (
+	"bytes"
 	"encoding/xml"
 	"errors"
 	"io"
@@ -38,7 +39,10 @@ func WriteAll(o Output, in Input) error {
 	}
 }
 
-type sitemapWriter struct{}
+type sitemapWriter struct {
+	// temporary buffer used to escape string values for XML
+	buf bytes.Buffer
+}
 
 // writeIndexFile writes Sitemap index file for N files.
 func (s *sitemapWriter) writeIndexFile(w io.Writer, in Input, nfiles int) error {
@@ -115,7 +119,11 @@ func (s *sitemapWriter) writeXmlUrlLoc(w io.Writer, loc string) {
 }
 
 func (s *sitemapWriter) writeXmlString(w io.Writer, str string) {
-	xml.EscapeText(w, []byte(str))
+	// Here we try to perform an "alloc-free" conversion of a dynamic string
+	// to a byte slice using a temporary buffer.
+	s.buf.Reset()
+	_, _ = s.buf.WriteString(str)
+	_ = xml.EscapeText(w, s.buf.Bytes())
 }
 
 // Below are constant strings converted to byte slices ahead of time

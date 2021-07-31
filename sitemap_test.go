@@ -824,3 +824,56 @@ func BenchmarkWriteIndex(b *testing.B) {
 		})
 	}
 }
+
+func TestSitemapWriter_writeXmlString(t *testing.T) {
+	RegisterTestingT(t)
+
+	testCases := []struct {
+		In, Out string
+	}{
+		{},
+		{In: "abc", Out: "abc"},
+		{In: "<b>", Out: "&lt;b&gt;"},
+		{In: "c;d", Out: "c;d"},
+		{In: "&", Out: "&amp;"},
+		{In: `'="`, Out: "&#39;=&#34;"},
+		{
+			In:  `a'b"c&d<e>f` + "\tg\nh\ri",
+			Out: "a&#39;b&#34;c&amp;d&lt;e&gt;f&#x9;g&#xA;h&#xD;i",
+		},
+		{
+			In:  `https://goiguide.com/showcase`,
+			Out: `https://goiguide.com/showcase`,
+		},
+		{
+			In:  `https://goiguide.com/showcase?a=1&b=2`,
+			Out: `https://goiguide.com/showcase?a=1&amp;b=2`,
+		},
+	}
+
+	var s sitemapWriter
+	for _, tc := range testCases {
+		var b bytes.Buffer
+		s.writeXmlString(&b, tc.In)
+		Ω(b.String()).Should(Equal(tc.Out), tc.In)
+	}
+}
+
+func BenchmarkSitemapWriter_writeXmlString(b *testing.B) {
+	b.Run("short", func(b *testing.B) {
+		var s sitemapWriter
+
+		for n := 0; n < b.N; n++ {
+			s.writeXmlString(ioutil.Discard, "short")
+		}
+	})
+
+	b.Run("long", func(b *testing.B) {
+		var s sitemapWriter
+
+		for n := 0; n < b.N; n++ {
+			s.writeXmlString(ioutil.Discard,
+				"https://goiguide.com/showcase?a=1&b=2")
+		}
+	})
+}
