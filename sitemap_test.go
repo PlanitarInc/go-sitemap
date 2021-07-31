@@ -17,8 +17,8 @@ import (
 )
 
 func TestWriteAll(t *testing.T) {
-	customEntry := func(idx int) UrlEntry {
-		return simpleEntry{
+	customEntry := func(idx int) *UrlEntry {
+		return &UrlEntry{
 			Loc:     fmt.Sprintf("http://goiguide.com/%d", idx),
 			LastMod: minDate.AddDate(1, 2, 3),
 			Images: []string{
@@ -289,7 +289,7 @@ func TestSitemapWriter_WriteUrlsetFile(t *testing.T) {
 		`)))
 
 		out.Reset()
-		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: []simpleEntry{{}, {}, {}, {}}})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: []UrlEntry{{}, {}, {}, {}}})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -312,7 +312,7 @@ func TestSitemapWriter_WriteUrlsetFile(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		RegisterTestingT(t)
 
-		entries := []simpleEntry{
+		entries := []UrlEntry{
 			{
 				Loc:     "one",
 				LastMod: time.Date(1999, 12, 31, 23, 59, 59, 0, time.UTC),
@@ -351,7 +351,7 @@ func TestSitemapWriter_WriteUrlsetFile(t *testing.T) {
 	t.Run("images", func(t *testing.T) {
 		RegisterTestingT(t)
 
-		entries := []simpleEntry{
+		entries := []UrlEntry{
 			{
 				Images: []string{},
 			},
@@ -373,7 +373,7 @@ func TestSitemapWriter_WriteUrlsetFile(t *testing.T) {
 </urlset>
 		`)))
 
-		entries = []simpleEntry{
+		entries = []UrlEntry{
 			{
 				Loc:    "one",
 				Images: []string{"a", "b", "c"},
@@ -429,7 +429,7 @@ func TestSitemapWriter_WriteUrlsetFile(t *testing.T) {
 	t.Run("escaping", func(t *testing.T) {
 		RegisterTestingT(t)
 
-		entries := []simpleEntry{
+		entries := []UrlEntry{
 			{
 				Loc:    `http://www.example.com/q="<'a'&'b'>"`,
 				Images: []string{`"<`, `qwe&qw&ewq`, `asd`},
@@ -463,7 +463,7 @@ func TestSitemapWriter_WriteUrlsetFile(t *testing.T) {
 			RegisterTestingT(t)
 
 			in := dynamicInput{
-				DefaultEntry: simpleEntry{
+				DefaultEntry: UrlEntry{
 					Loc:     "http://www.example.com/qweqwe",
 					LastMod: minDate.AddDate(1, 2, 3),
 					Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
@@ -480,7 +480,7 @@ func TestSitemapWriter_WriteUrlsetFile(t *testing.T) {
 			RegisterTestingT(t)
 
 			in := dynamicInput{
-				DefaultEntry: simpleEntry{
+				DefaultEntry: UrlEntry{
 					Loc:     "http://www.example.com/qweqwe",
 					LastMod: minDate.AddDate(1, 2, 3),
 					Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
@@ -623,7 +623,7 @@ func TestSitemapWriter_WriteIndexFile(t *testing.T) {
 }
 
 type arrayInput struct {
-	Arr             []simpleEntry
+	Arr             []UrlEntry
 	CustomUrlsetUrl func(int) string
 
 	nextIdx int
@@ -633,10 +633,10 @@ func (a arrayInput) HasNext() bool {
 	return a.nextIdx < len(a.Arr)
 }
 
-func (a *arrayInput) Next() UrlEntry {
+func (a *arrayInput) Next() *UrlEntry {
 	idx := a.nextIdx
 	a.nextIdx++
-	return a.Arr[idx]
+	return &a.Arr[idx]
 }
 
 func (a *arrayInput) GetUrlsetUrl(idx int) string {
@@ -645,24 +645,6 @@ func (a *arrayInput) GetUrlsetUrl(idx int) string {
 	}
 
 	return fmt.Sprintf("urlset no. %d", idx+1)
-}
-
-type simpleEntry struct {
-	Loc     string
-	LastMod time.Time
-	Images  []string
-}
-
-func (e simpleEntry) GetLoc() string {
-	return e.Loc
-}
-
-func (e simpleEntry) GetLastMod() time.Time {
-	return e.LastMod
-}
-
-func (e simpleEntry) GetImages() []string {
-	return e.Images
 }
 
 type failiingOutput struct {
@@ -708,8 +690,8 @@ func (o *bufferOuput) Urlset() io.Writer {
 
 type dynamicInput struct {
 	Size            int
-	DefaultEntry    simpleEntry
-	CustomEntry     func(int) UrlEntry
+	DefaultEntry    UrlEntry
+	CustomEntry     func(int) *UrlEntry
 	CustomUrlsetUrl func(int) string
 
 	nextIdx int
@@ -723,14 +705,14 @@ func (d dynamicInput) HasNext() bool {
 	return d.nextIdx < d.Size
 }
 
-func (d *dynamicInput) Next() UrlEntry {
+func (d *dynamicInput) Next() *UrlEntry {
 	idx := d.nextIdx
 	d.nextIdx++
 	if d.CustomEntry != nil {
 		return d.CustomEntry(idx)
 	}
 
-	return d.DefaultEntry
+	return &d.DefaultEntry
 }
 
 func (d *dynamicInput) GetUrlsetUrl(idx int) string {
@@ -754,7 +736,7 @@ func (discardOutput) Urlset() io.Writer {
 func BenchmarkWriteAll(b *testing.B) {
 	var out discardOutput
 	in := dynamicInput{
-		DefaultEntry: simpleEntry{
+		DefaultEntry: UrlEntry{
 			Loc:     "http://www.example.com/qweqwe",
 			LastMod: minDate.AddDate(1, 2, 3),
 			Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
@@ -778,7 +760,7 @@ func BenchmarkWriteAll(b *testing.B) {
 
 func BenchmarkWriteUrlset(b *testing.B) {
 	in := dynamicInput{
-		DefaultEntry: simpleEntry{
+		DefaultEntry: UrlEntry{
 			Loc:     "http://www.example.com/qweqwe",
 			LastMod: minDate.AddDate(1, 2, 3),
 			Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
@@ -803,7 +785,7 @@ func BenchmarkWriteUrlset(b *testing.B) {
 
 func BenchmarkWriteIndex(b *testing.B) {
 	in := dynamicInput{
-		DefaultEntry: simpleEntry{
+		DefaultEntry: UrlEntry{
 			Loc:     "http://www.example.com/qweqwe",
 			LastMod: minDate.AddDate(1, 2, 3),
 			Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},

@@ -51,8 +51,8 @@ func TestChannelInput_Feed(t *testing.T) {
 		RegisterTestingT(t)
 
 		in := NewChannelInput(nil)
-		go in.Feed(&simpleEntry{Loc: "one"})
-		Eventually(in.channel).Should(Receive(Equal(&simpleEntry{Loc: "one"})))
+		go in.Feed(&UrlEntry{Loc: "one"})
+		Eventually(in.channel).Should(Receive(Equal(&UrlEntry{Loc: "one"})))
 		Ω(in.channel).ShouldNot(BeClosed())
 	})
 
@@ -62,7 +62,7 @@ func TestChannelInput_Feed(t *testing.T) {
 		in := NewChannelInput(nil)
 		in.Close()
 		Ω(in.channel).Should(BeClosed())
-		in.Feed(&simpleEntry{Loc: "one"})
+		in.Feed(&UrlEntry{Loc: "one"})
 	})
 }
 
@@ -78,9 +78,9 @@ func TestChannelInput_Next(t *testing.T) {
 		RegisterTestingT(t)
 
 		in := NewChannelInput(nil)
-		in.lastReadEntry = &simpleEntry{Loc: "one"}
+		in.lastReadEntry = &UrlEntry{Loc: "one"}
 
-		Ω(in.Next()).Should(Equal(&simpleEntry{Loc: "one"}))
+		Ω(in.Next()).Should(Equal(&UrlEntry{Loc: "one"}))
 	})
 }
 
@@ -91,16 +91,16 @@ func TestChannelInput_HasNext(t *testing.T) {
 		in := NewChannelInput(nil)
 
 		Ω(in.lastReadEntry).Should(BeNil())
-		go in.Feed(&simpleEntry{Loc: "one"})
+		go in.Feed(&UrlEntry{Loc: "one"})
 		Ω(in.HasNext()).Should(BeTrue())
-		Ω(in.lastReadEntry).Should(Equal(&simpleEntry{Loc: "one"}))
+		Ω(in.lastReadEntry).Should(Equal(&UrlEntry{Loc: "one"}))
 	})
 
 	t.Run("Close", func(t *testing.T) {
 		RegisterTestingT(t)
 
 		in := NewChannelInput(nil)
-		in.lastReadEntry = &simpleEntry{Loc: "one"}
+		in.lastReadEntry = &UrlEntry{Loc: "one"}
 
 		go func(in *ChannelInput) {
 			time.Sleep(100 * time.Millisecond)
@@ -140,15 +140,15 @@ func TestWriteAll_ChannelInput(t *testing.T) {
 	})
 
 	go func(in *ChannelInput) {
-		in.Feed(&simpleEntry{Loc: "a"})
+		in.Feed(&UrlEntry{Loc: "a"})
 	}(in)
 	go func(in *ChannelInput) {
 		time.Sleep(100 * time.Millisecond)
-		in.Feed(&simpleEntry{Loc: "b"})
+		in.Feed(&UrlEntry{Loc: "b"})
 	}(in)
 	go func(in *ChannelInput) {
 		time.Sleep(200 * time.Millisecond)
-		in.Feed(&simpleEntry{Loc: "c"})
+		in.Feed(&UrlEntry{Loc: "c"})
 	}(in)
 	go func(in *ChannelInput) {
 		time.Sleep(500 * time.Millisecond)

@@ -11,14 +11,14 @@ import (
 )
 
 func ExampleWriteAll_stdout() {
-	entries := []SimpleEntry{
+	entries := []sitemap.UrlEntry{
 		{
-			Url:      "http://example.com/",
-			Modified: time.Date(2025, time.November, 2, 11, 34, 58, 123, time.UTC),
+			Loc:     "http://example.com/",
+			LastMod: time.Date(2025, time.November, 2, 11, 34, 58, 123, time.UTC),
 		},
 		{
-			Url: "http://example.com/test/",
-			ImageUrls: []string{
+			Loc: "http://example.com/test/",
+			Images: []string{
 				"http://example.com/test/1.jpg",
 				"http://example.com/test/2.jpg",
 				"http://example.com/test/3.jpg",
@@ -64,14 +64,14 @@ func ExampleWriteAll_stdout() {
 }
 
 func ExampleWriteAll_buffers() {
-	entries := []SimpleEntry{
+	entries := []sitemap.UrlEntry{
 		{
-			Url:      "http://example.com/",
-			Modified: time.Date(2025, time.November, 2, 11, 34, 58, 123, time.UTC),
+			Loc:     "http://example.com/",
+			LastMod: time.Date(2025, time.November, 2, 11, 34, 58, 123, time.UTC),
 		},
 		{
-			Url: "http://example.com/test/",
-			ImageUrls: []string{
+			Loc: "http://example.com/test/",
+			Images: []string{
 				"http://example.com/test/1.jpg",
 				"http://example.com/test/2.jpg",
 				"http://example.com/test/3.jpg",
@@ -155,7 +155,7 @@ func (o *bufferOutput) Urlset() io.Writer {
 }
 
 type arrayInput struct {
-	Arr     []SimpleEntry
+	Arr     []sitemap.UrlEntry
 	NextIdx int
 }
 
@@ -163,30 +163,12 @@ func (a arrayInput) HasNext() bool {
 	return a.NextIdx < len(a.Arr)
 }
 
-func (a *arrayInput) Next() sitemap.UrlEntry {
+func (a *arrayInput) Next() *sitemap.UrlEntry {
 	idx := a.NextIdx
 	a.NextIdx++
-	return a.Arr[idx]
+	return &a.Arr[idx]
 }
 
 func (a *arrayInput) GetUrlsetUrl(n int) string {
 	return fmt.Sprintf("https://example.com/sitemap-%d.xml", n)
-}
-
-type SimpleEntry struct {
-	Url       string
-	Modified  time.Time
-	ImageUrls []string
-}
-
-func (e SimpleEntry) GetLoc() string {
-	return e.Url
-}
-
-func (e SimpleEntry) GetLastMod() time.Time {
-	return e.Modified
-}
-
-func (e SimpleEntry) GetImages() []string {
-	return e.ImageUrls
 }

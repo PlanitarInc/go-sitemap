@@ -3,20 +3,20 @@ package sitemap
 import "sync/atomic"
 
 type ChannelInput struct {
-	channel       chan UrlEntry
+	channel       chan *UrlEntry
 	closed        int32
-	lastReadEntry UrlEntry
+	lastReadEntry *UrlEntry
 	getUrlsetUrl  func(int) string
 }
 
 func NewChannelInput(getUrlsetUrl func(int) string) *ChannelInput {
 	return &ChannelInput{
-		channel:      make(chan UrlEntry),
+		channel:      make(chan *UrlEntry),
 		getUrlsetUrl: getUrlsetUrl,
 	}
 }
 
-func (in *ChannelInput) Feed(entry UrlEntry) {
+func (in *ChannelInput) Feed(entry *UrlEntry) {
 	if atomic.LoadInt32(&in.closed) > 0 {
 		return
 	}
@@ -48,7 +48,7 @@ func (in *ChannelInput) HasNext() bool {
 	return true
 }
 
-func (in *ChannelInput) Next() UrlEntry {
+func (in *ChannelInput) Next() *UrlEntry {
 	return in.lastReadEntry
 }
 

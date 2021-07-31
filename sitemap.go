@@ -71,29 +71,20 @@ func (s *sitemapWriter) writeUrlsetFile(w io.Writer, in Input) error {
 	return capErr
 }
 
-func (s *sitemapWriter) writeXmlUrlEntry(w io.Writer, e UrlEntry) {
-	loc := e.GetLoc()
-	lastMod := e.GetLastMod()
-	images := e.GetImages()
-	if lastMod.Before(minDate) && len(images) == 0 {
-		// fast path
-		s.writeXmlUrlLoc(w, loc)
-		return
-	}
-
+func (s *sitemapWriter) writeXmlUrlEntry(w io.Writer, e *UrlEntry) {
 	w.Write(tagUrlOpen)
 	w.Write(tagLocOpen)
-	s.writeXmlString(w, loc)
+	s.writeXmlString(w, e.Loc)
 	w.Write(tagLocClose)
-	if !lastMod.Before(minDate) {
+	if !e.LastMod.Before(minDate) {
 		w.Write(tagLastmodOpen)
-		s.writeXmlTime(w, lastMod)
+		s.writeXmlTime(w, e.LastMod)
 		w.Write(tagLastmodClose)
 	}
-	if len(images) > 0 {
-		for i := range images {
+	if len(e.Images) > 0 {
+		for i := range e.Images {
 			w.Write(tagImageOpen)
-			s.writeXmlString(w, images[i])
+			s.writeXmlString(w, e.Images[i])
 			w.Write(tagImageClose)
 		}
 	}

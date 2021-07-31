@@ -6,15 +6,15 @@ import (
 )
 
 type Input interface {
-	Next() UrlEntry
+	Next() *UrlEntry
 	HasNext() bool
 	GetUrlsetUrl(idx int) string
 }
 
-type UrlEntry interface {
-	GetLoc() string
-	GetLastMod() time.Time
-	GetImages() []string
+type UrlEntry struct {
+	Loc     string
+	LastMod time.Time
+	Images  []string
 }
 
 type Output interface {
