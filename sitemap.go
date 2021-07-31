@@ -38,11 +38,11 @@ type sitemapWriter struct {
 func (s *sitemapWriter) writeIndexFile(w io.Writer, in Input, nfiles int) error {
 	abortWriter := abortWriter{underlying: w}
 
-	abortWriter.Write(indexHeader)
+	_, _ = abortWriter.Write(indexHeader)
 	for i := 0; i < nfiles; i++ {
 		s.writeXmlUrlLoc(&abortWriter, in.GetUrlsetUrl(i))
 	}
-	abortWriter.Write(indexFooter)
+	_, _ = abortWriter.Write(indexFooter)
 
 	return abortWriter.firstErr
 }
@@ -53,7 +53,7 @@ func (s *sitemapWriter) writeUrlsetFile(w io.Writer, in Input) error {
 	abortWriter := abortWriter{underlying: w}
 	var capErr error
 
-	abortWriter.Write(urlsetHeader)
+	_, _ = abortWriter.Write(urlsetHeader)
 	for count := 0; in.HasNext(); count++ {
 		if count >= maxSitemapCap {
 			capErr = errMaxCapReached{}
@@ -62,7 +62,7 @@ func (s *sitemapWriter) writeUrlsetFile(w io.Writer, in Input) error {
 
 		s.writeXmlUrlEntry(&abortWriter, in.Next())
 	}
-	abortWriter.Write(urlsetFooter)
+	_, _ = abortWriter.Write(urlsetFooter)
 
 	if abortWriter.firstErr != nil {
 		return abortWriter.firstErr
@@ -72,31 +72,31 @@ func (s *sitemapWriter) writeUrlsetFile(w io.Writer, in Input) error {
 }
 
 func (s *sitemapWriter) writeXmlUrlEntry(w io.Writer, e *UrlEntry) {
-	w.Write(tagUrlOpen)
-	w.Write(tagLocOpen)
+	_, _ = w.Write(tagUrlOpen)
+	_, _ = w.Write(tagLocOpen)
 	s.writeXmlString(w, e.Loc)
-	w.Write(tagLocClose)
+	_, _ = w.Write(tagLocClose)
 	if !e.LastMod.Before(minDate) {
-		w.Write(tagLastmodOpen)
+		_, _ = w.Write(tagLastmodOpen)
 		s.writeXmlTime(w, e.LastMod)
-		w.Write(tagLastmodClose)
+		_, _ = w.Write(tagLastmodClose)
 	}
 	if len(e.Images) > 0 {
 		for i := range e.Images {
-			w.Write(tagImageOpen)
+			_, _ = w.Write(tagImageOpen)
 			s.writeXmlString(w, e.Images[i])
-			w.Write(tagImageClose)
+			_, _ = w.Write(tagImageClose)
 		}
 	}
-	w.Write(tagUrlClose)
+	_, _ = w.Write(tagUrlClose)
 }
 
 func (s *sitemapWriter) writeXmlUrlLoc(w io.Writer, loc string) {
-	w.Write(tagUrlOpen)
-	w.Write(tagLocOpen)
+	_, _ = w.Write(tagUrlOpen)
+	_, _ = w.Write(tagLocOpen)
 	s.writeXmlString(w, loc)
-	w.Write(tagLocClose)
-	w.Write(tagUrlClose)
+	_, _ = w.Write(tagLocClose)
+	_, _ = w.Write(tagUrlClose)
 }
 
 func (s *sitemapWriter) writeXmlString(w io.Writer, str string) {
@@ -113,7 +113,7 @@ func (s *sitemapWriter) writeXmlTime(w io.Writer, t time.Time) {
 	s.buf.Reset()
 	s.buf.Grow(len(time.RFC3339) * 2) // *2 is just in case
 	bs := t.AppendFormat(s.buf.Bytes(), time.RFC3339)
-	w.Write(bs)
+	_, _ = w.Write(bs)
 }
 
 // Below are constant strings converted to byte slices ahead of time
