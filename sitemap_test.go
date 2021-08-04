@@ -17,8 +17,8 @@ import (
 )
 
 func TestWriteAll(t *testing.T) {
-	customEntry := func(idx int) UrlEntry {
-		return simpleEntry{
+	customEntry := func(idx int) *UrlEntry {
+		return &UrlEntry{
 			Loc:     fmt.Sprintf("http://goiguide.com/%d", idx),
 			LastMod: minDate.AddDate(1, 2, 3),
 			Images: []string{
@@ -84,7 +84,8 @@ func TestWriteAll(t *testing.T) {
 		Ω(out.sitemaps).Should(HaveLen(1))
 		Ω(out.sitemaps[0].String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"></urlset>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+</urlset>
 		`)))
 	})
 
@@ -274,19 +275,21 @@ func TestWriteAll(t *testing.T) {
 	})
 }
 
-func TestWriteUrlsetFile(t *testing.T) {
+func TestSitemapWriter_WriteUrlsetFile(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		RegisterTestingT(t)
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeUrlsetFile(&out, &arrayInput{})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"></urlset>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+</urlset>
 		`)))
 
 		out.Reset()
-		Ω(writeUrlsetFile(&out, &arrayInput{Arr: []simpleEntry{{}, {}, {}, {}}})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: []UrlEntry{{}, {}, {}, {}}})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -309,7 +312,7 @@ func TestWriteUrlsetFile(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		RegisterTestingT(t)
 
-		entries := []simpleEntry{
+		entries := []UrlEntry{
 			{
 				Loc:     "one",
 				LastMod: time.Date(1999, 12, 31, 23, 59, 59, 0, time.UTC),
@@ -324,8 +327,9 @@ func TestWriteUrlsetFile(t *testing.T) {
 			},
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -347,15 +351,16 @@ func TestWriteUrlsetFile(t *testing.T) {
 	t.Run("images", func(t *testing.T) {
 		RegisterTestingT(t)
 
-		entries := []simpleEntry{
+		entries := []UrlEntry{
 			{
 				Images: []string{},
 			},
 			{},
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -368,7 +373,7 @@ func TestWriteUrlsetFile(t *testing.T) {
 </urlset>
 		`)))
 
-		entries = []simpleEntry{
+		entries = []UrlEntry{
 			{
 				Loc:    "one",
 				Images: []string{"a", "b", "c"},
@@ -383,7 +388,7 @@ func TestWriteUrlsetFile(t *testing.T) {
 		}
 
 		out.Reset()
-		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -424,15 +429,16 @@ func TestWriteUrlsetFile(t *testing.T) {
 	t.Run("escaping", func(t *testing.T) {
 		RegisterTestingT(t)
 
-		entries := []simpleEntry{
+		entries := []UrlEntry{
 			{
 				Loc:    `http://www.example.com/q="<'a'&'b'>"`,
 				Images: []string{`"<`, `qwe&qw&ewq`, `asd`},
 			},
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
+		Ω(s.writeUrlsetFile(&out, &arrayInput{Arr: entries})).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -457,7 +463,7 @@ func TestWriteUrlsetFile(t *testing.T) {
 			RegisterTestingT(t)
 
 			in := dynamicInput{
-				DefaultEntry: simpleEntry{
+				DefaultEntry: UrlEntry{
 					Loc:     "http://www.example.com/qweqwe",
 					LastMod: minDate.AddDate(1, 2, 3),
 					Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
@@ -465,7 +471,8 @@ func TestWriteUrlsetFile(t *testing.T) {
 				Size: 50_000 + 1,
 			}
 
-			Ω(writeUrlsetFile(ioutil.Discard, &in)).
+			var s sitemapWriter
+			Ω(s.writeUrlsetFile(ioutil.Discard, &in)).
 				Should(MatchError("max 50K capacity is reached"))
 		})
 
@@ -473,7 +480,7 @@ func TestWriteUrlsetFile(t *testing.T) {
 			RegisterTestingT(t)
 
 			in := dynamicInput{
-				DefaultEntry: simpleEntry{
+				DefaultEntry: UrlEntry{
 					Loc:     "http://www.example.com/qweqwe",
 					LastMod: minDate.AddDate(1, 2, 3),
 					Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
@@ -481,13 +488,14 @@ func TestWriteUrlsetFile(t *testing.T) {
 				Size: 50_000 + 1,
 			}
 
-			Ω(writeUrlsetFile(&failingWriter{}, &in)).
+			var s sitemapWriter
+			Ω(s.writeUrlsetFile(&failingWriter{}, &in)).
 				Should(MatchError("failingWriter error"))
 		})
 	})
 }
 
-func TestWriteIndexFile(t *testing.T) {
+func TestSitemapWriter_WriteIndexFile(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		RegisterTestingT(t)
 
@@ -495,19 +503,22 @@ func TestWriteIndexFile(t *testing.T) {
 			return ""
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: emptyUrl}, 0)).Should(BeNil())
+		Ω(s.writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: emptyUrl}, 0)).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></sitemapindex>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+</sitemapindex>
 		`)))
 	})
 
 	t.Run("default", func(t *testing.T) {
 		RegisterTestingT(t)
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeIndexFile(&out, &arrayInput{}, 3)).Should(BeNil())
+		Ω(s.writeIndexFile(&out, &arrayInput{}, 3)).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -531,8 +542,9 @@ func TestWriteIndexFile(t *testing.T) {
 			return fmt.Sprintf("custom @%03d@", idx)
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: simpleUrl}, 4)).Should(BeNil())
+		Ω(s.writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: simpleUrl}, 4)).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -568,8 +580,9 @@ func TestWriteIndexFile(t *testing.T) {
 			}
 		}
 
+		var s sitemapWriter
 		var out bytes.Buffer
-		Ω(writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: fancyUrl}, 5)).Should(BeNil())
+		Ω(s.writeIndexFile(&out, &arrayInput{CustomUrlsetUrl: fancyUrl}, 5)).Should(BeNil())
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -602,14 +615,15 @@ func TestWriteIndexFile(t *testing.T) {
 				},
 			}
 
-			Ω(writeIndexFile(&failingWriter{}, &in, 100)).
+			var s sitemapWriter
+			Ω(s.writeIndexFile(&failingWriter{}, &in, 100)).
 				Should(MatchError("failingWriter error"))
 		})
 	})
 }
 
 type arrayInput struct {
-	Arr             []simpleEntry
+	Arr             []UrlEntry
 	CustomUrlsetUrl func(int) string
 
 	nextIdx int
@@ -619,10 +633,10 @@ func (a arrayInput) HasNext() bool {
 	return a.nextIdx < len(a.Arr)
 }
 
-func (a *arrayInput) Next() UrlEntry {
+func (a *arrayInput) Next() *UrlEntry {
 	idx := a.nextIdx
 	a.nextIdx++
-	return a.Arr[idx]
+	return &a.Arr[idx]
 }
 
 func (a *arrayInput) GetUrlsetUrl(idx int) string {
@@ -631,24 +645,6 @@ func (a *arrayInput) GetUrlsetUrl(idx int) string {
 	}
 
 	return fmt.Sprintf("urlset no. %d", idx+1)
-}
-
-type simpleEntry struct {
-	Loc     string
-	LastMod time.Time
-	Images  []string
-}
-
-func (e simpleEntry) GetLoc() string {
-	return e.Loc
-}
-
-func (e simpleEntry) GetLastMod() time.Time {
-	return e.LastMod
-}
-
-func (e simpleEntry) GetImages() []string {
-	return e.Images
 }
 
 type failiingOutput struct {
@@ -694,8 +690,8 @@ func (o *bufferOuput) Urlset() io.Writer {
 
 type dynamicInput struct {
 	Size            int
-	DefaultEntry    simpleEntry
-	CustomEntry     func(int) UrlEntry
+	DefaultEntry    UrlEntry
+	CustomEntry     func(int) *UrlEntry
 	CustomUrlsetUrl func(int) string
 
 	nextIdx int
@@ -709,14 +705,14 @@ func (d dynamicInput) HasNext() bool {
 	return d.nextIdx < d.Size
 }
 
-func (d *dynamicInput) Next() UrlEntry {
+func (d *dynamicInput) Next() *UrlEntry {
 	idx := d.nextIdx
 	d.nextIdx++
 	if d.CustomEntry != nil {
 		return d.CustomEntry(idx)
 	}
 
-	return d.DefaultEntry
+	return &d.DefaultEntry
 }
 
 func (d *dynamicInput) GetUrlsetUrl(idx int) string {
@@ -740,7 +736,7 @@ func (discardOutput) Urlset() io.Writer {
 func BenchmarkWriteAll(b *testing.B) {
 	var out discardOutput
 	in := dynamicInput{
-		DefaultEntry: simpleEntry{
+		DefaultEntry: UrlEntry{
 			Loc:     "http://www.example.com/qweqwe",
 			LastMod: minDate.AddDate(1, 2, 3),
 			Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
@@ -764,7 +760,7 @@ func BenchmarkWriteAll(b *testing.B) {
 
 func BenchmarkWriteUrlset(b *testing.B) {
 	in := dynamicInput{
-		DefaultEntry: simpleEntry{
+		DefaultEntry: UrlEntry{
 			Loc:     "http://www.example.com/qweqwe",
 			LastMod: minDate.AddDate(1, 2, 3),
 			Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
@@ -773,6 +769,7 @@ func BenchmarkWriteUrlset(b *testing.B) {
 			return "const url"
 		},
 	}
+	var s sitemapWriter
 
 	for p := 0; p < 7; p++ {
 		size := int(math.Pow10(p))
@@ -780,7 +777,7 @@ func BenchmarkWriteUrlset(b *testing.B) {
 			in.Size = size
 			for n := 0; n < b.N; n++ {
 				in.Reset()
-				_ = writeUrlsetFile(ioutil.Discard, &in)
+				_ = s.writeUrlsetFile(ioutil.Discard, &in)
 			}
 		})
 	}
@@ -788,7 +785,7 @@ func BenchmarkWriteUrlset(b *testing.B) {
 
 func BenchmarkWriteIndex(b *testing.B) {
 	in := dynamicInput{
-		DefaultEntry: simpleEntry{
+		DefaultEntry: UrlEntry{
 			Loc:     "http://www.example.com/qweqwe",
 			LastMod: minDate.AddDate(1, 2, 3),
 			Images:  []string{"http://www.example.com/qweqwe/thumb.jpg"},
@@ -797,14 +794,124 @@ func BenchmarkWriteIndex(b *testing.B) {
 			return "const url"
 		},
 	}
+	var s sitemapWriter
 
 	for p := 0; p < 6; p++ {
 		nfiles := int(math.Pow10(p))
 		b.Run(strconv.Itoa(nfiles), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
 				in.Reset()
-				_ = writeIndexFile(ioutil.Discard, &in, nfiles)
+				_ = s.writeIndexFile(ioutil.Discard, &in, nfiles)
 			}
 		})
 	}
+}
+
+func TestSitemapWriter_writeXmlString(t *testing.T) {
+	RegisterTestingT(t)
+
+	testCases := []struct {
+		In, Out string
+	}{
+		{},
+		{In: "abc", Out: "abc"},
+		{In: "<b>", Out: "&lt;b&gt;"},
+		{In: "c;d", Out: "c;d"},
+		{In: "&", Out: "&amp;"},
+		{In: `'="`, Out: "&#39;=&#34;"},
+		{
+			In:  `a'b"c&d<e>f` + "\tg\nh\ri",
+			Out: "a&#39;b&#34;c&amp;d&lt;e&gt;f&#x9;g&#xA;h&#xD;i",
+		},
+		{
+			In:  `https://goiguide.com/showcase`,
+			Out: `https://goiguide.com/showcase`,
+		},
+		{
+			In:  `https://goiguide.com/showcase?a=1&b=2`,
+			Out: `https://goiguide.com/showcase?a=1&amp;b=2`,
+		},
+	}
+
+	var s sitemapWriter
+	for _, tc := range testCases {
+		var b bytes.Buffer
+		s.writeXmlString(&b, tc.In)
+		Ω(b.String()).Should(Equal(tc.Out), tc.In)
+	}
+}
+
+func BenchmarkSitemapWriter_writeXmlString(b *testing.B) {
+	b.Run("short", func(b *testing.B) {
+		var s sitemapWriter
+		for n := 0; n < b.N; n++ {
+			s.writeXmlString(ioutil.Discard, "short")
+		}
+	})
+
+	b.Run("long", func(b *testing.B) {
+		var s sitemapWriter
+		for n := 0; n < b.N; n++ {
+			s.writeXmlString(ioutil.Discard,
+				"https://goiguide.com/showcase?a=1&b=2")
+		}
+	})
+}
+
+func TestSitemapWriter_writeXmlTime(t *testing.T) {
+	RegisterTestingT(t)
+
+	tz1 := time.FixedZone("negative", -15*60*60)
+	tz2 := time.FixedZone("positive", 15*60*60)
+
+	testCases := []struct {
+		In  time.Time
+		Out string
+	}{
+		{
+			Out: "0001-01-01T00:00:00Z",
+		},
+		{
+			In:  time.Date(1999, time.December, 31, 23, 59, 59, 0, time.UTC),
+			Out: "1999-12-31T23:59:59Z",
+		},
+		{
+			In:  time.Date(2020, time.March, 15, 12, 13, 14, 999, time.UTC),
+			Out: "2020-03-15T12:13:14Z",
+		},
+		{
+			In:  time.Date(2021, time.July, 31, 23, 59, 59, 7, tz1),
+			Out: "2021-07-31T23:59:59-15:00",
+		},
+		{
+			In:  time.Date(2022, time.November, 29, 23, 59, 59, 7, tz2),
+			Out: "2022-11-29T23:59:59+15:00",
+		},
+	}
+
+	var s sitemapWriter
+	for _, tc := range testCases {
+		var b bytes.Buffer
+		s.writeXmlTime(&b, tc.In)
+		Ω(b.String()).Should(Equal(tc.Out), tc.In.Format(time.RFC3339))
+	}
+}
+
+func BenchmarkSitemapWriter_writeXmlTime(b *testing.B) {
+	b.Run("utc", func(b *testing.B) {
+		var s sitemapWriter
+		for n := 0; n < b.N; n++ {
+			t := time.Date(2020, time.March, n, 12, 13, 14, 7, time.UTC)
+			s.writeXmlTime(ioutil.Discard, t)
+		}
+	})
+
+	b.Run("custom", func(b *testing.B) {
+		tz1 := time.FixedZone("negative", -15*60*60)
+		var s sitemapWriter
+		for n := 0; n < b.N; n++ {
+			t := time.Date(2020, time.March, n, 12, 13, 14, 7, tz1)
+			s.writeXmlTime(ioutil.Discard, t)
+		}
+	})
 }

@@ -3,7 +3,7 @@
 
 A GO library for generating Sitemap XML files.
 
-Example (https://play.golang.org/p/gnefFFOgWjJ):
+### Example
 
 ```go
 package main
@@ -32,54 +32,36 @@ func (out *SitemapOutput) Urlset() io.Writer {
 }
 
 type ArrayInput struct {
-	Arr     []SimpleEntry
-	NextIdx int
+	Arr     []sitemap.UrlEntry
+	nextIdx int
 }
 
 func (a ArrayInput) HasNext() bool {
-	return a.NextIdx < len(a.Arr)
+	return a.nextIdx < len(a.Arr)
 }
 
-func (a *ArrayInput) Next() sitemap.UrlEntry {
-	idx := a.NextIdx
-	a.NextIdx++
-	return a.Arr[idx]
+func (a *ArrayInput) Next() *sitemap.UrlEntry {
+	idx := a.nextIdx
+	a.nextIdx++
+	return &a.Arr[idx]
 }
 
 func (a *ArrayInput) GetUrlsetUrl(n int) string {
-	return fmt.Sprintf("https://example.com/sitemap-%d.xml", n)
-}
-
-type SimpleEntry struct {
-	Url       string
-	Modified  time.Time
-	ImageUrls []string
-}
-
-func (e SimpleEntry) GetLoc() string {
-	return e.Url
-}
-
-func (e SimpleEntry) GetLastMod() time.Time {
-	return e.Modified
-}
-
-func (e SimpleEntry) GetImages() []string {
-	return e.ImageUrls
+	return fmt.Sprintf("https://goiguide.com/sitemap-%d.xml", n)
 }
 
 func main() {
-	entries := []SimpleEntry{
+	entries := []sitemap.UrlEntry{
 		{
-			Url:      "http://example.com/",
-			Modified: time.Date(2025, time.November, 2, 11, 34, 58, 123, time.UTC),
+			Loc:     "http://goiguide.com/",
+			LastMod: time.Date(2025, time.November, 2, 11, 34, 58, 123, time.UTC),
 		},
 		{
-			Url: "http://example.com/test/",
-			ImageUrls: []string{
-				"http://example.com/test/1.jpg",
-				"http://example.com/test/2.jpg",
-				"http://example.com/test/3.jpg",
+			Loc: "http://goiguide.com/test/",
+			Images: []string{
+				"http://goiguide.com/test/1.jpg",
+				"http://goiguide.com/test/2.jpg",
+				"http://goiguide.com/test/3.jpg",
 			},
 		},
 	}
@@ -100,25 +82,26 @@ func main() {
 ```
 
 The output:
+
 ```
 ::: Urlset 0
 
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
-    <loc>http://example.com/</loc>
+    <loc>http://goiguide.com/</loc>
     <lastmod>2025-11-02T11:34:58Z</lastmod>
   </url>
   <url>
-    <loc>http://example.com/test/</loc>
+    <loc>http://goiguide.com/test/</loc>
     <image:image>
-      <image:loc>http://example.com/test/1.jpg</image:loc>
+      <image:loc>http://goiguide.com/test/1.jpg</image:loc>
     </image:image>
     <image:image>
-      <image:loc>http://example.com/test/2.jpg</image:loc>
+      <image:loc>http://goiguide.com/test/2.jpg</image:loc>
     </image:image>
     <image:image>
-      <image:loc>http://example.com/test/3.jpg</image:loc>
+      <image:loc>http://goiguide.com/test/3.jpg</image:loc>
     </image:image>
   </url>
 </urlset>
@@ -128,7 +111,28 @@ The output:
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://example.com/sitemap-0.xml</loc>
+    <loc>https://goiguide.com/sitemap-0.xml</loc>
   </url>
 </sitemapindex>
+```
+
+### Benchmark
+
+The library is trying to be smart when producing XML and keeps the allocations
+constant. That is, space complexity is `O(1)` -- it does not depend on the
+number of entries.
+
+```
+$ go test -run '^$' -bench . -benchmem
+goos: darwin
+goarch: amd64
+pkg: github.com/PlanitarInc/go-sitemap
+cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
+BenchmarkWriteAll/1-12                      	 1315534	       905.3 ns/op	     128 B/op	       3 allocs/op
+BenchmarkWriteAll/10-12                     	  176637	      6779 ns/op	     128 B/op	       3 allocs/op
+BenchmarkWriteAll/100-12                    	   18620	     64473 ns/op	     128 B/op	       3 allocs/op
+BenchmarkWriteAll/1000-12                   	    1846	    639137 ns/op	     128 B/op	       3 allocs/op
+BenchmarkWriteAll/10000-12                  	     186	   6436503 ns/op	     128 B/op	       3 allocs/op
+BenchmarkWriteAll/100000-12                 	      18	  64117438 ns/op	     160 B/op	       4 allocs/op
+BenchmarkWriteAll/1000000-12                	       2	 642308146 ns/op	     736 B/op	      22 allocs/op
 ```
