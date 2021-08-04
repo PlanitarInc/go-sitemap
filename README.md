@@ -5,6 +5,8 @@ A GO library for generating Sitemap XML files.
 
 ### Example
 
+GO Playground: https://play.golang.org/p/PTYJXlJt8ep
+
 ```go
 package main
 
