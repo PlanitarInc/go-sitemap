@@ -5,7 +5,7 @@ A GO library for generating Sitemap XML files.
 
 ### Example
 
-GO Playground: https://play.golang.org/p/PTYJXlJt8ep
+<!-- GO Playground: https://play.golang.org/p/PTYJXlJt8ep -->
 
 ```go
 package main
@@ -38,14 +38,13 @@ type ArrayInput struct {
 	nextIdx int
 }
 
-func (a ArrayInput) HasNext() bool {
-	return a.nextIdx < len(a.Arr)
-}
-
 func (a *ArrayInput) Next() *sitemap.UrlEntry {
-	idx := a.nextIdx
+	if a.nextIdx >= len(a.Arr) {
+		return nil
+	}
+
 	a.nextIdx++
-	return &a.Arr[idx]
+	return &a.Arr[a.nextIdx-1]
 }
 
 func (a *ArrayInput) GetUrlsetUrl(n int) string {
@@ -130,11 +129,11 @@ goos: darwin
 goarch: amd64
 pkg: github.com/PlanitarInc/go-sitemap
 cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
-BenchmarkWriteAll/1-12                      	 1315534	       905.3 ns/op	     128 B/op	       3 allocs/op
-BenchmarkWriteAll/10-12                     	  176637	      6779 ns/op	     128 B/op	       3 allocs/op
-BenchmarkWriteAll/100-12                    	   18620	     64473 ns/op	     128 B/op	       3 allocs/op
-BenchmarkWriteAll/1000-12                   	    1846	    639137 ns/op	     128 B/op	       3 allocs/op
-BenchmarkWriteAll/10000-12                  	     186	   6436503 ns/op	     128 B/op	       3 allocs/op
-BenchmarkWriteAll/100000-12                 	      18	  64117438 ns/op	     160 B/op	       4 allocs/op
-BenchmarkWriteAll/1000000-12                	       2	 642308146 ns/op	     736 B/op	      22 allocs/op
+BenchmarkWriteAll/1-12                      	 1328336	       945.2 ns/op	     128 B/op	       3 allocs/op
+BenchmarkWriteAll/10-12                     	  150031	      6808 ns/op	     128 B/op	       3 allocs/op
+BenchmarkWriteAll/100-12                    	   17624	     62340 ns/op	     128 B/op	       3 allocs/op
+BenchmarkWriteAll/1000-12                   	    1898	    627547 ns/op	     128 B/op	       3 allocs/op
+BenchmarkWriteAll/10000-12                  	     192	   6315018 ns/op	     128 B/op	       3 allocs/op
+BenchmarkWriteAll/100000-12                 	      18	  62742897 ns/op	     160 B/op	       4 allocs/op
+BenchmarkWriteAll/1000000-12                	       2	 632302752 ns/op	     736 B/op	      22 allocs/op
 ```
