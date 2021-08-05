@@ -30,41 +30,6 @@ func TestWriteAll(t *testing.T) {
 		return fmt.Sprintf("urlset %03d", idx)
 	}
 
-	type simpleSitemap struct {
-		Locs []string `xml:"url>loc"`
-	}
-
-	assertOutput := func(out *bufferOuput, expSize int) {
-		nsitemaps := int(math.Ceil(float64(expSize) / 50_000))
-
-		var index simpleSitemap
-		Ω(xml.Unmarshal(out.index.Bytes(), &index)).Should(BeNil())
-		Ω(index.Locs).Should(HaveLen(nsitemaps))
-		for i := 0; i < nsitemaps; i++ {
-			Ω(index.Locs[i]).Should(Equal(fmt.Sprintf("urlset %03d", i)))
-		}
-
-		Ω(out.sitemaps).Should(HaveLen(nsitemaps))
-		var totalLocs int
-		for i := 0; i < nsitemaps; i++ {
-			var s simpleSitemap
-			Ω(xml.Unmarshal(out.sitemaps[i].Bytes(), &s)).Should(BeNil())
-
-			urlsetOffset := i * 50_000
-			nlocs := expSize - urlsetOffset
-			if nlocs > 50_000 {
-				nlocs = 50_000
-			}
-			Ω(s.Locs).Should(HaveLen(nlocs))
-
-			totalLocs += len(s.Locs)
-			for j := 0; j < nlocs; j++ {
-				Ω(s.Locs[j]).Should(Equal(fmt.Sprintf("http://goiguide.com/%d", urlsetOffset+j+1)))
-			}
-		}
-		Ω(totalLocs).Should(Equal(expSize))
-	}
-
 	t.Run("empty", func(t *testing.T) {
 		RegisterTestingT(t)
 
@@ -815,6 +780,41 @@ func TestSitemapWriter_WriteIndexFile(t *testing.T) {
 				Should(MatchError("failingWriter error"))
 		})
 	})
+}
+
+func assertOutput(out *bufferOuput, expSize int) {
+	type simpleSitemap struct {
+		Locs []string `xml:"url>loc"`
+	}
+
+	nsitemaps := int(math.Ceil(float64(expSize) / 50_000))
+
+	var index simpleSitemap
+	Ω(xml.Unmarshal(out.index.Bytes(), &index)).Should(BeNil())
+	Ω(index.Locs).Should(HaveLen(nsitemaps))
+	for i := 0; i < nsitemaps; i++ {
+		Ω(index.Locs[i]).Should(Equal(fmt.Sprintf("urlset %03d", i)))
+	}
+
+	Ω(out.sitemaps).Should(HaveLen(nsitemaps))
+	var totalLocs int
+	for i := 0; i < nsitemaps; i++ {
+		var s simpleSitemap
+		Ω(xml.Unmarshal(out.sitemaps[i].Bytes(), &s)).Should(BeNil())
+
+		urlsetOffset := i * 50_000
+		nlocs := expSize - urlsetOffset
+		if nlocs > 50_000 {
+			nlocs = 50_000
+		}
+		Ω(s.Locs).Should(HaveLen(nlocs))
+
+		totalLocs += len(s.Locs)
+		for j := 0; j < nlocs; j++ {
+			Ω(s.Locs[j]).Should(Equal(fmt.Sprintf("http://goiguide.com/%d", urlsetOffset+j+1)))
+		}
+	}
+	Ω(totalLocs).Should(Equal(expSize))
 }
 
 type arrayInput struct {
