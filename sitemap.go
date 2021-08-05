@@ -3,7 +3,6 @@ package sitemap
 import (
 	"bytes"
 	"encoding/xml"
-	"errors"
 	"io"
 	"time"
 )
@@ -21,11 +20,11 @@ func WriteAll(o Output, in Input) error {
 		nfiles++
 		var err error
 		carryOverEntry, err = s.writeUrlsetFile(o.Urlset(), in, carryOverEntry)
-		if err != nil && !errors.Is(err, errMaxCapReached{}) {
+		if err != nil {
 			return err
 		}
 
-		if err == nil {
+		if carryOverEntry == nil {
 			return s.writeIndexFile(o.Index(), in, nfiles)
 		}
 	}
@@ -88,11 +87,7 @@ func (s *sitemapWriter) writeUrlsetFile(
 		return nil, abortWriter.firstErr
 	}
 
-	if carryOverEntry != nil {
-		return carryOverEntry, errMaxCapReached{}
-	}
-
-	return nil, nil
+	return carryOverEntry, nil
 }
 
 func (s *sitemapWriter) writeXmlUrlEntry(w io.Writer, e *UrlEntry) {
@@ -187,9 +182,3 @@ func (w *abortWriter) Write(p []byte) (n int, err error) {
 const (
 	maxSitemapCap = 50_000
 )
-
-type errMaxCapReached struct{}
-
-func (e errMaxCapReached) Error() string {
-	return "max 50K capacity is reached"
-}

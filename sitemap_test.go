@@ -461,7 +461,7 @@ func TestSitemapWriter_WriteUrlsetFile(t *testing.T) {
 
 			var s sitemapWriter
 			co, err := s.writeUrlsetFile(ioutil.Discard, &in, nil)
-			Ω(err).Should(MatchError("max 50K capacity is reached"))
+			Ω(err).Should(BeNil())
 			Ω(co).Should(Equal(&UrlEntry{
 				Loc:     "http://www.example.com/qweqwe",
 				LastMod: minDate.AddDate(1, 2, 3),
