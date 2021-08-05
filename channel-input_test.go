@@ -67,47 +67,54 @@ func TestChannelInput_Feed(t *testing.T) {
 }
 
 func TestChannelInput_Next(t *testing.T) {
+	t.Run("single", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		in := NewChannelInput(nil)
+
+		go in.Feed(&UrlEntry{Loc: "one"})
+		Ω(in.Next()).Should(Equal(&UrlEntry{Loc: "one"}))
+		Ω(in.channel).ShouldNot(BeClosed())
+
+		go in.Close()
+		Ω(in.Next()).Should(BeNil())
+		Ω(in.channel).Should(BeClosed())
+	})
+
+	t.Run("multiple", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		in := NewChannelInput(nil)
+
+		go func(in *ChannelInput) {
+			in.Feed(&UrlEntry{Loc: "one"})
+			in.Feed(&UrlEntry{Loc: "two"})
+		}(in)
+
+		Ω(in.Next()).Should(Equal(&UrlEntry{Loc: "one"}))
+		Ω(in.Next()).Should(Equal(&UrlEntry{Loc: "two"}))
+		Ω(in.channel).ShouldNot(BeClosed())
+
+		go in.Feed(&UrlEntry{Loc: "three"})
+		Ω(in.Next()).Should(Equal(&UrlEntry{Loc: "three"}))
+		Ω(in.channel).ShouldNot(BeClosed())
+
+		go in.Close()
+		Ω(in.Next()).Should(BeNil())
+		Ω(in.channel).Should(BeClosed())
+	})
+
 	t.Run("empty", func(t *testing.T) {
 		RegisterTestingT(t)
 
 		in := NewChannelInput(nil)
-		Ω(in.Next()).Should(BeNil())
-	})
-
-	t.Run("next", func(t *testing.T) {
-		RegisterTestingT(t)
-
-		in := NewChannelInput(nil)
-		in.lastReadEntry = &UrlEntry{Loc: "one"}
-
-		Ω(in.Next()).Should(Equal(&UrlEntry{Loc: "one"}))
-	})
-}
-
-func TestChannelInput_HasNext(t *testing.T) {
-	t.Run("Feed", func(t *testing.T) {
-		RegisterTestingT(t)
-
-		in := NewChannelInput(nil)
-
-		Ω(in.lastReadEntry).Should(BeNil())
-		go in.Feed(&UrlEntry{Loc: "one"})
-		Ω(in.HasNext()).Should(BeTrue())
-		Ω(in.lastReadEntry).Should(Equal(&UrlEntry{Loc: "one"}))
-	})
-
-	t.Run("Close", func(t *testing.T) {
-		RegisterTestingT(t)
-
-		in := NewChannelInput(nil)
-		in.lastReadEntry = &UrlEntry{Loc: "one"}
 
 		go func(in *ChannelInput) {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 			in.Close()
 		}(in)
-		Ω(in.HasNext()).Should(BeFalse())
-		Ω(in.lastReadEntry).Should(BeNil())
+
+		Ω(in.Next()).Should(BeNil())
 		Ω(in.channel).Should(BeClosed())
 	})
 }
@@ -217,7 +224,7 @@ func TestWriteAll_ChannelInput(t *testing.T) {
 		`))
 	})
 
-	t.Run("multiplePages", func(t *testing.T) {
+	t.Run("multipleFiles", func(t *testing.T) {
 		RegisterTestingT(t)
 
 		inputSize := 58_765
@@ -228,7 +235,7 @@ func TestWriteAll_ChannelInput(t *testing.T) {
 
 		go func(in *ChannelInput) {
 			for i := 0; i < inputSize; i++ {
-				in.Feed(&UrlEntry{Loc: fmt.Sprintf("http://goiguide.com/%d", i+1)})
+				in.Feed(&UrlEntry{Loc: fmt.Sprintf("http://goiguide.com/%d", i)})
 			}
 			in.Close()
 		}(in)

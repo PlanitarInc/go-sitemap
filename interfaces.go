@@ -6,8 +6,10 @@ import (
 )
 
 type Input interface {
+	// Next returns the next UrlEntry to be written. The function should
+	// return nil if and only if there are no more items.
 	Next() *UrlEntry
-	HasNext() bool
+	// GetUrlsetUrl returns a URL for the Urlset file at the given index.
 	GetUrlsetUrl(idx int) string
 }
 

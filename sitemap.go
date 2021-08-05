@@ -16,9 +16,11 @@ import (
 func WriteAll(o Output, in Input) error {
 	var s sitemapWriter
 	var nfiles int
+	var carryOverEntry *UrlEntry
 	for {
 		nfiles++
-		err := s.writeUrlsetFile(o.Urlset(), in, nfiles > 1)
+		var err error
+		carryOverEntry, err = s.writeUrlsetFile(o.Urlset(), in, carryOverEntry)
 		if err != nil && !errors.Is(err, errMaxCapReached{}) {
 			return err
 		}
@@ -49,36 +51,48 @@ func (s *sitemapWriter) writeIndexFile(w io.Writer, in Input, nfiles int) error 
 
 // writeUrlsetFile writes a single Sitemap Urlset file for the first 50K entries
 // in the given input.
-func (s *sitemapWriter) writeUrlsetFile(w io.Writer, in Input, continuing bool) error {
+func (s *sitemapWriter) writeUrlsetFile(
+	w io.Writer,
+	in Input,
+	prevEntry *UrlEntry,
+) (*UrlEntry, error) {
 	abortWriter := abortWriter{underlying: w}
-	var capErr error
 
 	_, _ = abortWriter.Write(urlsetHeader)
 
 	var count int
-	// This is a continuation of a previous iteration. Write the next entry
-	// without calling "HasNext()". Otherwise, we could lose an entry if
-	// "HasNext()" advances the iterator.
-	if continuing {
-		s.writeXmlUrlEntry(&abortWriter, in.Next())
+	// This is a continuation of a previous iteration. Write the carry-over
+	// entry without calling "Next()". Otherwise, we would lose an entry.
+	if prevEntry != nil {
+		s.writeXmlUrlEntry(&abortWriter, prevEntry)
 		count++
 	}
 
-	for ; in.HasNext(); count++ {
-		if count >= maxSitemapCap {
-			capErr = errMaxCapReached{}
+	var carryOverEntry *UrlEntry
+	for ; ; count++ {
+		entry := in.Next()
+		if entry == nil {
 			break
 		}
 
-		s.writeXmlUrlEntry(&abortWriter, in.Next())
+		if count >= maxSitemapCap {
+			carryOverEntry = entry
+			break
+		}
+
+		s.writeXmlUrlEntry(&abortWriter, entry)
 	}
 	_, _ = abortWriter.Write(urlsetFooter)
 
 	if abortWriter.firstErr != nil {
-		return abortWriter.firstErr
+		return nil, abortWriter.firstErr
 	}
 
-	return capErr
+	if carryOverEntry != nil {
+		return carryOverEntry, errMaxCapReached{}
+	}
+
+	return nil, nil
 }
 
 func (s *sitemapWriter) writeXmlUrlEntry(w io.Writer, e *UrlEntry) {

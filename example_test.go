@@ -202,14 +202,13 @@ type arrayInput struct {
 	nextIdx int
 }
 
-func (a arrayInput) HasNext() bool {
-	return a.nextIdx < len(a.Arr)
-}
-
 func (a *arrayInput) Next() *sitemap.UrlEntry {
-	idx := a.nextIdx
+	if a.nextIdx >= len(a.Arr) {
+		return nil
+	}
+
 	a.nextIdx++
-	return &a.Arr[idx]
+	return &a.Arr[a.nextIdx-1]
 }
 
 func (a *arrayInput) GetUrlsetUrl(n int) string {
@@ -222,11 +221,11 @@ type dynamicInput struct {
 	entry   sitemap.UrlEntry
 }
 
-func (d dynamicInput) HasNext() bool {
-	return d.nextIdx < d.Length
-}
-
 func (d *dynamicInput) Next() *sitemap.UrlEntry {
+	if d.nextIdx >= d.Length {
+		return nil
+	}
+
 	idx := d.nextIdx
 	d.nextIdx++
 	d.entry.Loc = fmt.Sprintf("https://goiguide.com/entry-%05d", idx)
