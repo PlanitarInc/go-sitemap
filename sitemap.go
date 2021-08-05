@@ -54,12 +54,14 @@ func (s *sitemapWriter) writeUrlsetFile(w io.Writer, in Input) error {
 	var capErr error
 
 	_, _ = abortWriter.Write(urlsetHeader)
-	for count := 0; in.HasNext(); count++ {
+	for count := 0; ; count++ {
 		if count >= maxSitemapCap {
 			capErr = errMaxCapReached{}
 			break
 		}
-
+		if !in.HasNext() {
+			break
+		}
 		s.writeXmlUrlEntry(&abortWriter, in.Next())
 	}
 	_, _ = abortWriter.Write(urlsetFooter)
