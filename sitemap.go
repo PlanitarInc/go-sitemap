@@ -18,7 +18,7 @@ func WriteAll(o Output, in Input) error {
 	var nfiles int
 	for {
 		nfiles++
-		err := s.writeUrlsetFile(o.Urlset(), in)
+		err := s.writeUrlsetFile(o.Urlset(), in, nfiles > 1)
 		if err != nil && !errors.Is(err, errMaxCapReached{}) {
 			return err
 		}
@@ -49,12 +49,22 @@ func (s *sitemapWriter) writeIndexFile(w io.Writer, in Input, nfiles int) error 
 
 // writeUrlsetFile writes a single Sitemap Urlset file for the first 50K entries
 // in the given input.
-func (s *sitemapWriter) writeUrlsetFile(w io.Writer, in Input) error {
+func (s *sitemapWriter) writeUrlsetFile(w io.Writer, in Input, continuing bool) error {
 	abortWriter := abortWriter{underlying: w}
 	var capErr error
 
 	_, _ = abortWriter.Write(urlsetHeader)
-	for count := 0; in.HasNext(); count++ {
+
+	var count int
+	// This is a continuation of a previous iteration. Write the next entry
+	// without calling "HasNext()". Otherwise, we could lose an entry if
+	// "HasNext()" advances the iterator.
+	if continuing {
+		s.writeXmlUrlEntry(&abortWriter, in.Next())
+		count++
+	}
+
+	for ; in.HasNext(); count++ {
 		if count >= maxSitemapCap {
 			capErr = errMaxCapReached{}
 			break
