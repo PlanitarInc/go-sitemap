@@ -34,8 +34,8 @@ func TestWriteAll(t *testing.T) {
 		Locs []string `xml:"url>loc"`
 	}
 
-	assertOutput := func(out *bufferOuput, in *dynamicInput) {
-		nsitemaps := int(math.Ceil(float64(in.Size) / 50_000))
+	assertOutput := func(out *bufferOuput, expSize int) {
+		nsitemaps := int(math.Ceil(float64(expSize) / 50_000))
 
 		var index simpleSitemap
 		Ω(xml.Unmarshal(out.index.Bytes(), &index)).Should(BeNil())
@@ -45,21 +45,24 @@ func TestWriteAll(t *testing.T) {
 		}
 
 		Ω(out.sitemaps).Should(HaveLen(nsitemaps))
+		var totalLocs int
 		for i := 0; i < nsitemaps; i++ {
 			var s simpleSitemap
 			Ω(xml.Unmarshal(out.sitemaps[i].Bytes(), &s)).Should(BeNil())
 
 			urlsetOffset := i * 50_000
-			nlocs := in.Size - urlsetOffset
+			nlocs := expSize - urlsetOffset
 			if nlocs > 50_000 {
 				nlocs = 50_000
 			}
 			Ω(s.Locs).Should(HaveLen(nlocs))
 
+			totalLocs += len(s.Locs)
 			for j := 0; j < nlocs; j++ {
 				Ω(s.Locs[j]).Should(Equal(fmt.Sprintf("http://goiguide.com/%d", urlsetOffset+j)))
 			}
 		}
+		Ω(totalLocs).Should(Equal(expSize))
 	}
 
 	t.Run("empty", func(t *testing.T) {
@@ -158,7 +161,7 @@ func TestWriteAll(t *testing.T) {
 </sitemapindex>
 		`)))
 
-		assertOutput(&out, &in)
+		assertOutput(&out, in.Size)
 	})
 
 	t.Run("minTwoSitemaps", func(t *testing.T) {
@@ -184,7 +187,7 @@ func TestWriteAll(t *testing.T) {
 </sitemapindex>
 		`)))
 
-		assertOutput(&out, &in)
+		assertOutput(&out, in.Size)
 	})
 
 	t.Run("maxTwoSitemaps", func(t *testing.T) {
@@ -198,7 +201,7 @@ func TestWriteAll(t *testing.T) {
 		var out bufferOuput
 
 		Ω(WriteAll(&out, &in)).Should(BeNil())
-		assertOutput(&out, &in)
+		assertOutput(&out, in.Size)
 	})
 
 	t.Run("multipleSitemaps", func(t *testing.T) {
@@ -212,7 +215,7 @@ func TestWriteAll(t *testing.T) {
 		var out bufferOuput
 
 		Ω(WriteAll(&out, &in)).Should(BeNil())
-		assertOutput(&out, &in)
+		assertOutput(&out, in.Size)
 	})
 
 	t.Run("numerousSitemaps", func(t *testing.T) {
@@ -226,7 +229,7 @@ func TestWriteAll(t *testing.T) {
 		var out bufferOuput
 
 		Ω(WriteAll(&out, &in)).Should(BeNil())
-		assertOutput(&out, &in)
+		assertOutput(&out, in.Size)
 	})
 
 	t.Run("failures", func(t *testing.T) {
