@@ -159,9 +159,9 @@ func TestWriteAll_ChannelInput(t *testing.T) {
 		Ω(out.index.String()).Should(MatchXML(`
 			<?xml version="1.0" encoding="UTF-8"?>
 			<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-			  <url>
+			  <sitemap>
 				<loc>channel input urlset 0</loc>
-			  </url>
+			  </sitemap>
 			</sitemapindex>
 		`))
 
@@ -206,9 +206,9 @@ func TestWriteAll_ChannelInput(t *testing.T) {
 		Ω(out.index.String()).Should(MatchXML(`
 			<?xml version="1.0" encoding="UTF-8"?>
 			<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-			  <url>
+			  <sitemap>
 				<loc>channel input urlset 0</loc>
-			  </url>
+			  </sitemap>
 			</sitemapindex>
 		`))
 

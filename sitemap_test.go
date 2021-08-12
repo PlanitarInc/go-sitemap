@@ -43,9 +43,9 @@ func TestWriteAll(t *testing.T) {
 		Ω(out.index.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
+  <sitemap>
     <loc>urlset 000</loc>
-  </url>
+  </sitemap>
 </sitemapindex>
 		`)))
 
@@ -71,9 +71,9 @@ func TestWriteAll(t *testing.T) {
 		Ω(out.index.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
+  <sitemap>
     <loc>urlset 000</loc>
-  </url>
+  </sitemap>
 </sitemapindex>
 		`)))
 
@@ -122,9 +122,9 @@ func TestWriteAll(t *testing.T) {
 		Ω(out.index.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
+  <sitemap>
     <loc>urlset 000</loc>
-  </url>
+  </sitemap>
 </sitemapindex>
 		`)))
 
@@ -145,12 +145,12 @@ func TestWriteAll(t *testing.T) {
 		Ω(out.index.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
+  <sitemap>
     <loc>urlset 000</loc>
-  </url>
-  <url>
+  </sitemap>
+  <sitemap>
     <loc>urlset 001</loc>
-  </url>
+  </sitemap>
 </sitemapindex>
 		`)))
 
@@ -559,15 +559,15 @@ func TestSitemapWriter_WriteIndexFile(t *testing.T) {
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
+  <sitemap>
     <loc>urlset no. 1</loc>
-  </url>
-  <url>
+  </sitemap>
+  <sitemap>
     <loc>urlset no. 2</loc>
-  </url>
-  <url>
+  </sitemap>
+  <sitemap>
     <loc>urlset no. 3</loc>
-  </url>
+  </sitemap>
 </sitemapindex>
 		`)))
 	})
@@ -585,18 +585,18 @@ func TestSitemapWriter_WriteIndexFile(t *testing.T) {
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
+  <sitemap>
     <loc>custom @000@</loc>
-  </url>
-  <url>
+  </sitemap>
+  <sitemap>
     <loc>custom @001@</loc>
-  </url>
-  <url>
+  </sitemap>
+  <sitemap>
     <loc>custom @002@</loc>
-  </url>
-  <url>
+  </sitemap>
+  <sitemap>
     <loc>custom @003@</loc>
-  </url>
+  </sitemap>
 </sitemapindex>
 		`)))
 	})
@@ -623,21 +623,21 @@ func TestSitemapWriter_WriteIndexFile(t *testing.T) {
 		Ω(out.String()).Should(Equal(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
+  <sitemap>
     <loc>http://www.example.com/q=&#34;&lt;&#39;a&#39;&amp;&#39;b&#39;&gt;</loc>
-  </url>
-  <url>
+  </sitemap>
+  <sitemap>
     <loc>🥴.com/</loc>
-  </url>
-  <url>
+  </sitemap>
+  <sitemap>
     <loc>гоуайгайд.ком/</loc>
-  </url>
-  <url>
+  </sitemap>
+  <sitemap>
     <loc>🤟.🤙/?idx=&lt;03&gt;&amp;e=/&#39;🤪?</loc>
-  </url>
-  <url>
+  </sitemap>
+  <sitemap>
     <loc>🤟.🤙/?idx=&lt;04&gt;&amp;e=/&#39;🤪?</loc>
-  </url>
+  </sitemap>
 </sitemapindex>
 		`)))
 	})
@@ -660,13 +660,17 @@ func TestSitemapWriter_WriteIndexFile(t *testing.T) {
 }
 
 func assertOutput(out *bufferOuput, expSize int) {
-	type simpleSitemap struct {
+	type sitemapList struct {
+		Locs []string `xml:"sitemap>loc"`
+	}
+
+	type urlList struct {
 		Locs []string `xml:"url>loc"`
 	}
 
 	nsitemaps := int(math.Ceil(float64(expSize) / 50_000))
 
-	var index simpleSitemap
+	var index sitemapList
 	Ω(xml.Unmarshal(out.index.Bytes(), &index)).Should(BeNil())
 	Ω(index.Locs).Should(HaveLen(nsitemaps))
 	for i := 0; i < nsitemaps; i++ {
@@ -676,7 +680,7 @@ func assertOutput(out *bufferOuput, expSize int) {
 	Ω(out.sitemaps).Should(HaveLen(nsitemaps))
 	var totalLocs int
 	for i := 0; i < nsitemaps; i++ {
-		var s simpleSitemap
+		var s urlList
 		Ω(xml.Unmarshal(out.sitemaps[i].Bytes(), &s)).Should(BeNil())
 
 		urlsetOffset := i * 50_000

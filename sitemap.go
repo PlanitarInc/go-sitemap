@@ -41,7 +41,7 @@ func (s *sitemapWriter) writeIndexFile(w io.Writer, in Input, nfiles int) error 
 
 	_, _ = abortWriter.Write(indexHeader)
 	for i := 0; i < nfiles; i++ {
-		s.writeXmlUrlLoc(&abortWriter, in.GetUrlsetUrl(i))
+		s.writeXmlSitemapLoc(&abortWriter, in.GetUrlsetUrl(i))
 	}
 	_, _ = abortWriter.Write(indexFooter)
 
@@ -110,12 +110,12 @@ func (s *sitemapWriter) writeXmlUrlEntry(w io.Writer, e *UrlEntry) {
 	_, _ = w.Write(tagUrlClose)
 }
 
-func (s *sitemapWriter) writeXmlUrlLoc(w io.Writer, loc string) {
-	_, _ = w.Write(tagUrlOpen)
+func (s *sitemapWriter) writeXmlSitemapLoc(w io.Writer, loc string) {
+	_, _ = w.Write(tagSitemapOpen)
 	_, _ = w.Write(tagLocOpen)
 	s.writeXmlString(w, loc)
 	_, _ = w.Write(tagLocClose)
-	_, _ = w.Write(tagUrlClose)
+	_, _ = w.Write(tagSitemapClose)
 }
 
 func (s *sitemapWriter) writeXmlString(w io.Writer, str string) {
@@ -150,6 +150,8 @@ var (
 	)
 	urlsetFooter = []byte(`</urlset>`)
 
+	tagSitemapOpen  = []byte("  <sitemap>\n")
+	tagSitemapClose = []byte("  </sitemap>\n")
 	tagUrlOpen      = []byte("  <url>\n")
 	tagUrlClose     = []byte("  </url>\n")
 	tagLocOpen      = []byte("    <loc>")
