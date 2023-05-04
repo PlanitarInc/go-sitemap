@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"strconv"
 	"strings"
@@ -460,7 +459,7 @@ func TestSitemapWriter_WriteUrlsetFile(t *testing.T) {
 			}
 
 			var s sitemapWriter
-			co, err := s.writeUrlsetFile(ioutil.Discard, &in, nil)
+			co, err := s.writeUrlsetFile(io.Discard, &in, nil)
 			Ω(err).Should(BeNil())
 			Ω(co).Should(Equal(&UrlEntry{
 				Loc:     "http://www.example.com/qweqwe",
@@ -800,11 +799,11 @@ func (d *dynamicInput) GetUrlsetUrl(idx int) string {
 type discardOutput struct{}
 
 func (discardOutput) Index() io.Writer {
-	return ioutil.Discard
+	return io.Discard
 }
 
 func (discardOutput) Urlset() io.Writer {
-	return ioutil.Discard
+	return io.Discard
 }
 
 func BenchmarkWriteAll(b *testing.B) {
@@ -851,7 +850,7 @@ func BenchmarkWriteUrlset(b *testing.B) {
 			in.Size = size
 			for n := 0; n < b.N; n++ {
 				in.Reset()
-				_, _ = s.writeUrlsetFile(ioutil.Discard, &in, nil)
+				_, _ = s.writeUrlsetFile(io.Discard, &in, nil)
 			}
 		})
 	}
@@ -875,7 +874,7 @@ func BenchmarkWriteIndex(b *testing.B) {
 		b.Run(strconv.Itoa(nfiles), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
 				in.Reset()
-				_ = s.writeIndexFile(ioutil.Discard, &in, nfiles)
+				_ = s.writeIndexFile(io.Discard, &in, nfiles)
 			}
 		})
 	}
@@ -919,14 +918,14 @@ func BenchmarkSitemapWriter_writeXmlString(b *testing.B) {
 	b.Run("short", func(b *testing.B) {
 		var s sitemapWriter
 		for n := 0; n < b.N; n++ {
-			s.writeXmlString(ioutil.Discard, "short")
+			s.writeXmlString(io.Discard, "short")
 		}
 	})
 
 	b.Run("long", func(b *testing.B) {
 		var s sitemapWriter
 		for n := 0; n < b.N; n++ {
-			s.writeXmlString(ioutil.Discard,
+			s.writeXmlString(io.Discard,
 				"https://goiguide.com/showcase?a=1&b=2")
 		}
 	})
@@ -976,7 +975,7 @@ func BenchmarkSitemapWriter_writeXmlTime(b *testing.B) {
 		var s sitemapWriter
 		for n := 0; n < b.N; n++ {
 			t := time.Date(2020, time.March, n, 12, 13, 14, 7, time.UTC)
-			s.writeXmlTime(ioutil.Discard, t)
+			s.writeXmlTime(io.Discard, t)
 		}
 	})
 
@@ -985,7 +984,7 @@ func BenchmarkSitemapWriter_writeXmlTime(b *testing.B) {
 		var s sitemapWriter
 		for n := 0; n < b.N; n++ {
 			t := time.Date(2020, time.March, n, 12, 13, 14, 7, tz1)
-			s.writeXmlTime(ioutil.Discard, t)
+			s.writeXmlTime(io.Discard, t)
 		}
 	})
 }
