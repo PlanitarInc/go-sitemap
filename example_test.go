@@ -130,9 +130,10 @@ func ExampleWriteAll_dynamicInput() {
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 	}
+
 	// Output:
 	// ::: Urlset 0
-
+	//
 	// <?xml version="1.0" encoding="UTF-8"?>
 	// <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 	//   <url>
@@ -157,9 +158,9 @@ func ExampleWriteAll_dynamicInput() {
 	//     </image:image>
 	//   </url>
 	// </urlset>
-
+	//
 	// ::: Index
-
+	//
 	// <?xml version="1.0" encoding="UTF-8"?>
 	// <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 	//   <sitemap>
