@@ -25,3 +25,5 @@ jobs:
 
     - name: Report Coveralls
       uses: coverallsapp/github-action@v2
+      with:
+        path-to-lcov: ./coverage.out
