@@ -1,7 +1,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/PlanitarInc/go-sitemap.svg)](https://pkg.go.dev/github.com/PlanitarInc/go-sitemap)
 ![CI Status](https://github.com/PlanitarInc/go-sitemap/actions/workflows/ci-flow.yml/badge.svg?branch=master) [![Coverage Status](https://coveralls.io/repos/github/PlanitarInc/go-sitemap/badge.svg)](https://coveralls.io/github/PlanitarInc/go-sitemap)
 
-A GO library for generating Sitemap XML files.
+A GO library for generating [Sitemap XML files](https://www.sitemaps.org/protocol.html).
 
 ### Example
 
